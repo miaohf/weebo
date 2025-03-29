@@ -1,71 +1,85 @@
-import React, { useState, useRef, useEffect } from 'react';
-// 使用其他图标替代，因为您可能没有安装react-icons
-// 可以使用Unicode符号作为临时解决方案
+import React, { useState, useRef } from 'react';
+import { FaMicrophone, FaKeyboard, FaImage } from 'react-icons/fa';
+import { MdSend } from 'react-icons/md';
+import { IoArrowUp, IoSend } from 'react-icons/io5';
+import { BsSendFill } from 'react-icons/bs';
+import { AiOutlineSend } from "react-icons/ai";
+import { IoIosPaperPlane } from "react-icons/io";
+import { BsArrowRightCircleFill } from "react-icons/bs";
 import './ChatInput.css';
 
 const ChatInput = ({ onSendMessage, isLoading, selectedSpeaker }) => {
   const [message, setMessage] = useState('');
   const [isRecordMode, setIsRecordMode] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
-  const [hasPermission, setHasPermission] = useState(null);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [selectedImagePreview, setSelectedImagePreview] = useState(null);
+  
   const audioChunks = useRef([]);
   const mediaRecorder = useRef(null);
-  const streamRef = useRef(null);
-
-  // 预检麦克风权限
-  useEffect(() => {
-    // 清理函数
-    return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-      }
-    };
-  }, []);
-
-  // 请求麦克风权限
-  const requestMicrophonePermission = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      setHasPermission(true);
-      return stream;
-    } catch (error) {
-      console.error('Error accessing microphone:', error);
-      setHasPermission(false);
-      alert('无法访问麦克风，请检查浏览器权限设置。');
-      return null;
-    }
-  };
-
-  const toggleInputMode = async () => {
-    // 当切换到录音模式时，提前请求权限
-    if (!isRecordMode) {
-      const hasAccess = await requestMicrophonePermission();
-      if (!hasAccess) return; // 如果没有权限，不切换模式
-    } else {
-      // 切换回文本模式时，停止所有音频轨道
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-      }
-    }
+  const fileInputRef = useRef(null);
+  
+  // 切换输入模式（文本/录音）
+  const toggleInputMode = () => {
     setIsRecordMode(!isRecordMode);
   };
 
+  // 处理文本消息提交
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (message.trim() && !isLoading) {
-      onSendMessage(message, selectedSpeaker);
+    
+    // 检查onSendMessage是否为函数
+    if (typeof onSendMessage !== 'function') {
+      console.error('Error: onSendMessage is not a function', onSendMessage);
+      alert('发送消息失败：内部错误');
+      return;
+    }
+    
+    if (selectedImage) {
+      // 发送图像消息
+      onSendMessage(message, [selectedImage], 'image', selectedSpeaker);
+      setMessage('');
+      setSelectedImage(null);
+      setSelectedImagePreview(null);
+    } else if (message.trim() && !isLoading) {
+      // 发送纯文本消息
+      onSendMessage(message, [], 'text', selectedSpeaker);
       setMessage('');
     }
   };
 
+  // 处理图像选择
+  const handleImageSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSelectedImage(file);
+      
+      // 创建预览
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSelectedImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // 清除选择的图像
+  const clearSelectedImage = () => {
+    setSelectedImage(null);
+    setSelectedImagePreview(null);
+    fileInputRef.current.value = '';
+  };
+
+  // 打开文件选择器
+  const openFileSelector = () => {
+    fileInputRef.current.click();
+  };
+
+  // 开始录音
   const startRecording = async (e) => {
     e.preventDefault();
-    // 如果已经有流，使用现有流；否则请求新的权限
     try {
-      const stream = streamRef.current || await requestMicrophonePermission();
-      if (!stream) return; // 权限检查失败
-      
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaRecorder.current = new MediaRecorder(stream);
       audioChunks.current = [];
 
@@ -78,66 +92,85 @@ const ChatInput = ({ onSendMessage, isLoading, selectedSpeaker }) => {
       mediaRecorder.current.onstop = () => {
         const audioBlob = new Blob(audioChunks.current, { type: 'audio/wav' });
         sendAudioMessage(audioBlob);
+        
+        // 清理媒体流
+        stream.getTracks().forEach(track => track.stop());
       };
 
       mediaRecorder.current.start();
       setIsRecording(true);
     } catch (error) {
-      console.error('Error starting recording:', error);
-      alert('录音启动失败，请重试。');
+      console.error('Error accessing microphone:', error);
+      alert('无法访问麦克风，请检查权限设置。');
     }
   };
 
+  // 停止录音
   const stopRecording = (e) => {
     e.preventDefault();
     if (mediaRecorder.current && isRecording) {
-      try {
-        mediaRecorder.current.stop();
-        setIsRecording(false);
-      } catch (error) {
-        console.error('Error stopping recording:', error);
-      }
+      mediaRecorder.current.stop();
+      setIsRecording(false);
     }
   };
 
+  // 发送音频消息
   const sendAudioMessage = async (audioBlob) => {
     if (audioBlob.size > 0 && !isLoading) {
-      onSendMessage(audioBlob, selectedSpeaker, true);
+      // 创建File对象，以便FormData可以正确处理
+      const audioFile = new File([audioBlob], 'audio.wav', { type: 'audio/wav' });
+      onSendMessage('', [audioFile], 'voice', selectedSpeaker);
     }
   };
 
   return (
     <div className="chat-input">
       <form onSubmit={handleSubmit}>
+        {/* 图像预览 */}
+        {selectedImagePreview && (
+          <div className="image-preview-container">
+            <img src={selectedImagePreview} alt="Preview" className="image-preview" />
+            <button 
+              type="button" 
+              className="clear-image-btn action-button"
+              onClick={clearSelectedImage}
+            >
+              &times;
+            </button>
+          </div>
+        )}
+        
         <div className="chat-input-controls">
+          {/* 切换录音/键盘模式 */}
           <button 
             type="button" 
-            className="mode-toggle-button"
+            className="mode-toggle-button action-button"
             onClick={toggleInputMode}
             disabled={isLoading}
           >
-            {isRecordMode ? '⌨️' : '🎤'}
+            {isRecordMode ? <FaKeyboard /> : <FaMicrophone />}
           </button>
 
+          {/* 录音模式 */}
           {isRecordMode ? (
             <button
-              type="button" // 确保按钮类型是button
               className={`record-button ${isRecording ? 'recording' : ''}`}
               onMouseDown={startRecording}
               onMouseUp={stopRecording}
               onTouchStart={startRecording}
               onTouchEnd={stopRecording}
               onMouseLeave={isRecording ? stopRecording : undefined}
-              disabled={isLoading || hasPermission === false}
+              disabled={isLoading}
             >
-              {isRecording ? '录音中...' : hasPermission === false ? '麦克风访问被拒绝' : '长按录音'}
+              {isRecording ? 'Recording...' : 'Long press to record'}
             </button>
           ) : (
             <>
+              {/* 文本输入模式 */}
               <textarea
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="请输入您的问题..."
+                placeholder={selectedImage ? "Add image description..." : "Please enter your message..."}
                 disabled={isLoading}
                 rows={1}
                 onKeyPress={(e) => {
@@ -147,12 +180,33 @@ const ChatInput = ({ onSendMessage, isLoading, selectedSpeaker }) => {
                   }
                 }}
               />
+              
+              {/* 图像上传按钮 */}
+              <button
+                type="button"
+                className="image-upload-button action-button"
+                onClick={openFileSelector}
+                disabled={isLoading}
+              >
+                <FaImage />
+              </button>
+              
+              {/* 隐藏的文件输入 */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={handleImageSelect}
+              />
+              
+              {/* 发送按钮 */}
               <button
                 type="submit"
-                className="send-button"
-                disabled={!message.trim() || isLoading}
+                className="send-button action-button"
+                disabled={(!(message.trim() || selectedImage)) || isLoading}
               >
-                发送
+                <BsArrowRightCircleFill />
               </button>
             </>
           )}

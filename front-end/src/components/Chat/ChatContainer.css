@@ -6,6 +6,9 @@
   position: relative; /* 添加相对定位 */
   max-width: 100%; /* 确保容器不溢出 */
   overflow-x: hidden; /* 防止横向滚动 */
+  background-color: #ffffff;
+  border: none; /* 移除可能的边框 */
+  box-shadow: none; /* 移除阴影 */
 }
 
 .toolbar {
@@ -54,8 +57,28 @@
 }
 
 .language-toggle {
-  margin-left: auto;
+  background-color: #f0f0f0;
+  border: none;
+  border-radius: 4px;
+  padding: 3px 8px;
+  margin-right: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
 }
+
+.language-toggle.active {
+  background-color: #7c9ae7;
+  color: white;
+}
+
+.language-toggle:hover {
+  background-color: #e0e0e0;
+}
+
+/* .language-toggle.active:hover {
+  background-color: #3a6cee;
+} */
 
 .chat-messages-container {
   flex: 1;
@@ -70,7 +93,9 @@
   right: 0;
   width: 100%;
   background-color: var(--bg-light);
-  border-top: 1px solid var(--border-color);
+  border-top: none !important; /* 使用!important确保覆盖可能的内联样式 */
+  box-shadow: none !important;
+  background-image: none !important; /* 防止使用背景图像创建分隔线 */
   padding: var(--spacing-md);
   z-index: 10; /* 确保在其他元素上方 */
   box-sizing: border-box;
@@ -111,4 +136,24 @@
   .bottom-controls {
     padding: var(--spacing-xs); /* 减少内边距 */
   }
+}
+
+/* 确保消息列表底部没有边框 */
+.message-list {
+  border-bottom: none;
+  margin-bottom: 0;
+  box-shadow: none;
+}
+
+/* 移除输入框容器的顶部边框 */
+.chat-input-container {
+  border-top: none !important;
+  box-shadow: none !important;
+  background-image: none !important;
+  padding-top: 10px;
+}
+
+/* 移除任何可能的分隔线元素 */
+.divider, .separator, hr {
+  display: none !important;
 } 

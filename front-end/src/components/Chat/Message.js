@@ -1,76 +1,85 @@
 import React from 'react';
 import './Message.css';
 
-function Message({ message, showChinese, onReplayAudio, isPlaying }) {
-  const { role, content, id } = message;
+const Message = ({ message, showChinese, onPlayAudio }) => {
+  // 添加调试日志，检查收到的消息对象
+  console.log("Message组件接收到消息:", message);
   
-  // 格式化时间
-  const formatTime = (timestamp) => {
-    if (!timestamp) return '';
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
+  // 解构消息内容
+  const { message_id, content, audio, role, status } = message;
   
-  // 渲染消息内容
-  const renderContent = () => {
-    // 检查是否是语音消息
-    if (typeof content === 'string' && content.includes('[语音消息]')) {
-      return (
-        <div className="audio-message">
-          <span className="audio-message-icon">🎤</span>
-          <span className="audio-message-text">语音消息</span>
-        </div>
-      );
+  // 确定要显示的文本内容
+  let displayContent = null;
+  
+  if (content) {
+    if (typeof content === 'object') {
+      if (showChinese && role === 'assistant') {
+        // 助手消息 + 显示中文：显示中英文
+        displayContent = (
+          <>
+            <p className="message-english">{content.english || ''}</p>
+            {content.chinese && content.chinese !== content.english && (
+              <p className="message-chinese">{content.chinese}</p>
+            )}
+          </>
+        );
+      } else {
+        // 默认情况（用户消息或不显示中文）：只显示英文
+        displayContent = <p>{content.english || ''}</p>;
+      }
+    } else {
+      // 如果是字符串类型，直接显示
+      displayContent = <p>{content}</p>;
     }
-    
-    // 检查content是否为字符串
-    if (typeof content === 'string') {
-      return <p>{content}</p>;
-    }
-    
-    // 检查content是否有english和chinese属性
-    if (!content.english && !content.chinese) {
-      return <p>无内容</p>;
-    }
-    
-    // 根据showChinese标志显示对应语言内容
-    return (
-      <>
-        {showChinese ? (
-          <p className="message-chinese">{content.chinese || '无中文内容'}</p>
-        ) : (
-          <p className="message-english">{content.english || '无英文内容'}</p>
-        )}
-      </>
-    );
-  };
+  }
+  
+  // 判断是否有音频
+  const hasAudio = !!audio && audio.path;
+  
+  // 决定是否显示中文（仅对助手消息）
+  const shouldShowChinese = role === 'assistant' && showChinese && content && content.chinese && content.chinese !== content.english;
+  
+  // 明确设置消息角色的CSS类
+  const messageClass = `message ${role || message.role || 'unknown'} ${shouldShowChinese ? 'show-chinese' : ''}`;
   
   return (
-    <div className={`message ${role}`}>
-      <div className="message-bubble">
-        <div className="message-header">
-          <div className="header-left">
-            <span className="role">{role === 'user' ? '用户' : '助手'}</span>
-            {/* 播放按钮移动到助手标签右侧，只在助手消息中显示 */}
-            {role === 'assistant' && (
-              <button 
-                className={`play-audio-button ${isPlaying ? 'playing' : ''}`}
-                onClick={() => onReplayAudio && onReplayAudio(id)}
-                disabled={isPlaying}
-              >
-                <span className="play-icon"></span>
-                {isPlaying ? '播放中...' : '播放'}
-              </button>
-            )}
+    <div className={messageClass}>
+      <div className="message-content">
+        {status === 'loading' && (
+          <div className="loading-indicator">
+            <span className="dot"></span>
+            <span className="dot"></span>
+            <span className="dot"></span>
           </div>
-          <span className="time">{formatTime(message.timestamp)}</span>
-        </div>
-        <div className="message-content">
-          {renderContent()}
-        </div>
+        )}
+        {displayContent}
+        
+        {/* 音频播放按钮 */}
+        {hasAudio && (
+          <button 
+            className="play-audio-btn"
+            onClick={() => onPlayAudio(message_id)}
+          >
+            播放音频
+          </button>
+        )}
+        
+        {/* 如果有图像，显示图像 */}
+        {message.images && message.images.length > 0 && (
+          <div className="message-images">
+            {message.images.map((img, index) => (
+              <img 
+                key={index} 
+                src={img.path} 
+                alt={img.description || '图像'} 
+                className="message-image"
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
-}
+};
 
 export default Message; 

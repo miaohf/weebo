@@ -1,97 +1,111 @@
+/* 输入框容器 */
+.chat-input-container {
+  display: flex;
+  padding: 12px 16px;
+  background-color: #fff;
+  border: none;
+  align-items: center;
+}
+
+/* 输入框 */
 .chat-input {
-  width: 100%;
+  flex: 1;
+  padding: 0;
+  border-radius: 20px;
+  border: none;
+  background-color: #f5f5f5;
+  font-size: 15px;
+  outline: none;
+  box-shadow: none;
 }
 
 .chat-input form {
   width: 100%;
 }
 
+/* 输入控件布局 */
 .chat-input-controls {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: 10px;
   width: 100%;
-  position: relative;
+  background-color: #f5f5f5;
+  border-radius: 20px;
+  padding: 6px 8px;
 }
 
-.mode-toggle-button {
+/* 统一所有按钮基础样式 */
+.action-button {
+  width: 36px;  /* 统一大小 */
+  height: 36px; /* 统一大小 */
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background-color: var(--primary-light);
-  color: var(--primary);
-  border: none;
-  cursor: pointer;
-  font-size: 1rem;
   transition: all 0.2s ease;
+  padding: 0;
+  background-color: transparent;
 }
 
-.mode-toggle-button:hover {
-  background-color: var(--primary-lighter);
+/* 统一所有图标大小 */
+.action-button svg {
+  width: 20px;   /* 统一图标大小 */
+  height: 20px;  /* 统一图标大小 */
 }
 
-.mode-toggle-button:active {
-  transform: scale(0.95);
+/* 模式切换和图片上传按钮样式 */
+.mode-toggle-button,
+.image-upload-button {
+  color: #5e6473;
 }
 
-.mode-toggle-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.mode-toggle-button:hover,
+.image-upload-button:hover {
+  background-color: #e9eaed;
 }
 
-.chat-input textarea {
-  flex: 1;
-  min-height: 40px;
-  max-height: 120px;
-  padding: 10px 15px;
-  border: 1px solid var(--border-color);
-  border-radius: 20px;
-  resize: none;
-  font-family: inherit;
-  font-size: 0.95rem;
-  line-height: 1.4;
-  background-color: var(--bg-light);
-  transition: border-color 0.2s ease;
-  outline: none;
-}
-
-.chat-input textarea:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 2px var(--primary-lightest);
-}
-
+/* 发送按钮样式 - 只修改颜色，保持大小一致 */
 .send-button {
-  padding: 8px 16px;
-  border: none;
-  border-radius: 20px;
-  background-color: var(--primary);
-  color: white;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
+  color: #0084ff; /* 蓝色 */
+  background-color: transparent; /* 透明背景 */
 }
 
 .send-button:hover {
-  background-color: var(--primary-dark);
+  background-color: #e9eaed; /* 悬停时的浅灰色背景 */
 }
 
 .send-button:disabled {
-  background-color: var(--gray-light);
+  color: #cfd3dc; /* 禁用状态的颜色 */
   cursor: not-allowed;
 }
 
+/* 文本输入区域 */
+.chat-input textarea {
+  flex: 1;
+  min-height: 24px;
+  max-height: 120px;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 20px;
+  resize: none;
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.4;
+  background-color: #f5f5f5;
+  outline: none;
+}
+
+/* 录音按钮 */
 .record-button {
   flex: 1;
-  height: 44px;
-  background-color: var(--bg-light);
-  border: 1px solid var(--border-color);
+  min-height: 40px;
+  background-color: #f0f2f5;
+  border: 1px solid #ddd;
   border-radius: 22px;
-  color: var(--text-secondary);
-  font-size: 0.95rem;
-  transition: all 0.3s ease;
+  color: #666;
+  font-size: 15px;
   cursor: pointer;
   user-select: none;
   display: flex;
@@ -101,35 +115,67 @@
 
 .record-button.recording {
   background-color: rgba(255, 0, 0, 0.1);
-  border-color: var(--danger);
-  color: var(--danger);
+  border-color: #ff4d4f;
+  color: #ff4d4f;
   animation: pulse 1.5s infinite;
 }
 
+/* 图片预览样式 */
+.image-preview-container {
+  position: relative;
+  margin-bottom: 10px;
+  max-width: 200px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #ddd;
+}
+
+.image-preview {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.clear-image-btn {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0;
+}
+
+/* 动画效果 */
 @keyframes pulse {
-  0% {
-    transform: scale(0.98);
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .action-button {
+    width: 32px;
+    height: 32px;
   }
-  50% {
-    transform: scale(1.02);
-  }
-  100% {
-    transform: scale(0.98);
+  
+  .action-button svg {
+    width: 18px;
+    height: 18px;
   }
 }
 
-@media (max-width: 768px) {
-  .mode-toggle-button,
-  .send-button {
-    width: 40px;
-    height: 40px;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  
-  .send-button span {
-    display: none;
-  }
+/* 确保底部控件没有边框 */
+.bottom-controls {
+  border-top: none;
+  box-shadow: none;
 } 

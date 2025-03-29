@@ -43,4 +43,11 @@ button, input, select, textarea {
 
 ::placeholder {
   color: #aaa;
-} 
+}
+
+/* 应用全局样式强制移除边框 */
+/* .App * {
+  border-top: none !important;
+  border-bottom: none !important;
+  box-shadow: none !important;
+}  */

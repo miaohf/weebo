@@ -29,7 +29,5 @@ export const AVAILABLE_SPEAKERS = [
 
 
 
-// // 添加全局speaker配置
-// export const AVAILABLE_SPEAKERS = ['default', 'af_sky', 'Churcher', 'Dinesen', 
-//   'Hearme', 'Joa', 'Massi', 'Scarlett', 'zonos-t-british-female', 'zonos_americanfemale'];
+
 

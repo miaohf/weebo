@@ -13,6 +13,7 @@ MIN_VALID_AUDIO_LENGTH = 0.5  # Minimum valid audio length (seconds)
 TTS_MODE = "api"  # "local" or "api"
 TTS_API_URL = "http://192.168.31.80:8000"
 TTS_SPEAKER = "zonos_americanfemale"  # Voice model to use
+TTS_TIMEOUT = 60  # 秒
 
 # Local TTS settings
 MAX_PHONEME_LENGTH = 510
@@ -38,3 +39,22 @@ CYAN = '\033[96m'
 YELLOW = '\033[93m'
 NEON_GREEN = '\033[92m'
 RESET_COLOR = '\033[0m'
+
+# 服务器配置
+PORT = 8080
+HOST = "0.0.0.0"
+
+# 音频配置
+AUDIO_STORAGE_DIR = "audio_cache"
+IMAGE_STORAGE_DIR = "image_cache"
+DEFAULT_SAMPLE_RATE = 24000
+DEFAULT_SPEAKER = "default"  
+
+# 文本处理配置
+MAX_SEGMENT_LENGTH = 250  # 文本分段最大长度
+
+# 数据库配置
+DATABASE_PATH = "data/messages.db"
+
+# 支持的音频格式
+SUPPORTED_AUDIO_FORMATS = ["wav", "mp3", "ogg"]

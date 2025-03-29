@@ -20,41 +20,51 @@ body {
 .App {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
   width: 100%;
-  max-width: 100vw;
-  overflow-x: hidden;
 }
 
 .App-header {
-  height: var(--header-height);
-  padding: 0 var(--spacing-lg);
-  background-color: var(--primary-color);
-  color: white;
+  background-color: #f8f9fa;
+  padding: 0 20px;
+  height: 50px;
+  position: relative;
   display: flex;
+  justify-content: center;
   align-items: center;
-  justify-content: space-between;
-  box-shadow: var(--shadow-md);
-  position: sticky;
-  top: 0;
-  z-index: 10;
+  z-index: 100;
+  border: none;
 }
 
-.App-header h1 {
-  font-size: 1.5rem;
-  font-weight: 600;
+.logo {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logo h1 {
+  margin: 0;
+  font-size: 18px;
+  color: #333;
+  white-space: nowrap;
+}
+
+.header-controls {
+  position: absolute;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
 }
 
 main {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-width: var(--chat-max-width);
-  margin: 0 auto;
-  position: relative;
-  height: 100vh;
   overflow: hidden;
+  position: relative;
 }
 
 .app-container {
@@ -69,11 +79,51 @@ main {
 
 /* 响应式设计 */
 @media (max-width: 768px) {
-  .App-header {
-    padding: 0 var(--spacing-md);
+  .logo {
+    min-width: 130px;
   }
   
-  main {
-    padding: var(--spacing-xs);
+  .header-controls {
+    gap: 8px;
+  }
+}
+
+/* 小屏幕进一步优化 */
+@media (max-width: 576px) {
+  .logo {
+    min-width: 120px;
+  }
+  
+  .App-header {
+    padding: 0 10px;
+  }
+  
+  .header-controls {
+    right: 10px;
+    gap: 6px;
+  }
+  
+  /* 在超小屏幕上使用图标替代文字按钮 */
+  .header-controls .control-item .button-text {
+    display: none;
+  }
+  
+  .header-controls .control-item .button-icon {
+    display: inline-block;
+  }
+}
+
+@media (max-width: 350px) {
+  .logo h1 {
+    font-size: 14px;
+    max-width: 100px; /* 限制标题宽度 */
+  }
+  
+  .App-header {
+    padding: 0 6px; /* 进一步减少内边距 */
+  }
+  
+  .header-controls {
+    gap: 4px; /* 减少控件间隙 */
   }
 } 

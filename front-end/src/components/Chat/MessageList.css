@@ -2,10 +2,14 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);
-  padding: var(--spacing-md);
+  padding: 16px;
   overflow-y: auto;
   flex: 1;
   height: 100%;
+  border: none;
+  
+  /* 平滑过渡 */
+  scroll-behavior: smooth;
 }
 
 /* 确保最后一条消息显示时有足够的底部空间 */
@@ -89,4 +93,9 @@
     padding: var(--spacing-sm);
     gap: var(--spacing-sm);
   }
+}
+
+/* 让消息列表在切换语言时有平滑过渡 */
+.message-list .message {
+  transition: all 0.3s ease;
 } 

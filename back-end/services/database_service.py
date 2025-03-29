@@ -1,5 +1,8 @@
 """Database service for chat history."""
-from models.database_models import init_db, Message, AudioSegment, MergedAudio
+# from models.database_models import init_db, Message, AudioSegment, MergedAudio
+from models.base import Base, init_db
+from models.message import Message
+from models.audio import AudioSegment, MergedAudio
 from sqlalchemy.orm import Session
 import json
 import os
@@ -7,6 +10,7 @@ from datetime import datetime
 import logging
 import uuid
 import traceback
+from models.message import Message
 
 logger = logging.getLogger(__name__)
 
@@ -101,73 +105,52 @@ class DatabaseService:
             logging.error(traceback.format_exc())
             return False
     
-    def update_message_audio(self, message_id, audio_paths, merged_info):
+    def update_message_audio(self, message_id, audio_info):
         """更新消息的音频信息"""
-
-        print(f"message_id, audio_paths, merged_info: {message_id}, {audio_paths}, {merged_info}")
         try:
-            with self.SessionLocal() as db:
-                # 尝试多种方式查找消息
-                message = None
+            with self.get_db() as db:
+                # 查找消息 - 先尝试与message_id匹配
+                message = db.query(Message).filter(Message.message_id == message_id).first()
                 
-                # 1. 通过完整key查找
-                key = f"assistant-{message_id}"
-                message = db.query(Message).filter(Message.key == key).first()
-                
-                # 2. 如果没找到，尝试通过消息ID查找
-                if not message:
-                    message = db.query(Message).filter(Message.message_id == message_id).first()
-                
-                # 3. 如果仍然没找到，尝试通过部分key匹配
-                if not message:
-                    message = db.query(Message).filter(
-                        Message.key.like(f"%{message_id}%")
-                    ).first()
+                # 如果找不到，尝试与id匹配
+                if not message and message_id.isdigit():
+                    message = db.query(Message).filter(Message.id == int(message_id)).first()
                 
                 if not message:
-                    logging.error(f"未找到消息: {key}")
+                    logging.error(f"未找到消息: {message_id}")
                     return False
                 
-                # 更新音频段落
-                if audio_paths:
-                    # 删除现有段落
-                    db.query(AudioSegment).filter(AudioSegment.message_id == message.id).delete()
-                    
-                    # 添加新的段落
-                    for segment in audio_paths:
-                        audio_segment = AudioSegment(
-                            message_id=message.id,
-                            segment_index=segment.get("segment_index", 0),
-                            path=segment.get("path", ""),
-                            text=segment.get("text", ""),
-                            sample_rate=segment.get("sample_rate", 24000)
-                        )
-                        db.add(audio_segment)
+                # 记录调试信息
+                logging.info(f"更新消息音频: {message_id}, 音频信息: {str(audio_info)[:100]}...")
                 
-                # 更新合并音频信息
-                if merged_info:
-                    # 查找现有的合并音频
-                    merged_audio = db.query(MergedAudio).filter(MergedAudio.message_id == message.id).first()
+                # 更新音频信息
+                if isinstance(audio_info, str):
+                    # 如果只是路径字符串
+                    message.audio_path = audio_info
+                    # 记录路径
+                    logging.info(f"更新音频路径: {audio_info}")
+                elif isinstance(audio_info, dict):
+                    # 如果是音频信息字典
+                    if "path" in audio_info:
+                        message.audio_path = audio_info["path"]
+                        logging.info(f"更新音频路径: {audio_info['path']}")
                     
-                    if merged_audio:
-                        merged_audio.path = merged_info.get("merged_path", "")
-                        merged_audio.sample_rate = merged_info.get("sample_rate", 24000)
+                    # 保存完整的音频信息
+                    if hasattr(message, 'audio_data'):
+                        message.audio_data = json.dumps(audio_info)
+                        logging.info(f"更新音频数据: {str(audio_info)[:50]}...")
                     else:
-                        # 创建新的合并音频记录
-                        merged_audio = MergedAudio(
-                            message_id=message.id,
-                            path=merged_info.get("merged_path", ""),
-                            sample_rate=merged_info.get("sample_rate", 24000)
-                        )
-                        db.add(merged_audio)
+                        logging.error(f"消息对象没有 audio_data 字段")
+                    
+                    # 处理音频段落
+                    if "segments" in audio_info and hasattr(self, 'save_audio_segments'):
+                        self.save_audio_segments(message_id, audio_info["segments"])
                 
+                # 提交更改
                 db.commit()
-            
-            logging.debug(f"已更新消息音频信息: {key}")
-            return True
-            
+                return True
         except Exception as e:
-            logging.error(f"更新消息音频信息失败: {e}")
+            logging.error(f"更新消息音频失败: {str(e)}")
             logging.error(traceback.format_exc())
             return False
     
@@ -210,9 +193,27 @@ class DatabaseService:
     def load_session(self):
         """加载会话历史记录"""
         try:
-            with self.SessionLocal() as db:
+            with self.get_db() as db:
+                # 确保查询字段与模型定义一致
                 messages = db.query(Message).order_by(Message.timestamp).all()
-                return [message.to_dict() for message in messages]
+                
+                # 将查询结果转换为字典列表
+                result = []
+                for msg in messages:
+                    message_dict = {
+                        "id": msg.id,
+                        "role": msg.role,
+                        "content": msg.content,
+                        "timestamp": msg.timestamp.isoformat() if msg.timestamp else None
+                    }
+                    
+                    # 添加音频路径（如果存在）
+                    if hasattr(msg, 'audio_path') and msg.audio_path:
+                        message_dict["audio_path"] = msg.audio_path
+                    
+                    result.append(message_dict)
+                
+                return result
         except Exception as e:
             logging.error(f"加载会话失败: {e}")
             logging.error(traceback.format_exc())
@@ -324,3 +325,131 @@ class DatabaseService:
             logging.error(f"更新消息ID格式失败: {e}")
             logging.error(traceback.format_exc())
             return 0
+
+    def add_message(self, message_data):
+        """添加新消息到数据库"""
+        try:
+            with self.get_db() as db:
+                # 创建新的消息对象
+                message = Message(
+                    message_id=message_data.get("message_id"),
+                    message_type=message_data.get("message_type", "text"),
+                    content=message_data.get("content"),
+                    status=message_data.get("status", "success")
+                )
+                
+                # 添加音频数据（如果存在）
+                if "audio" in message_data:
+                    message.audio_data = message_data["audio"]
+                    if isinstance(message_data["audio"], dict) and "path" in message_data["audio"]:
+                        message.audio_path = message_data["audio"]["path"]
+                
+                # 添加图像数据（如果存在）
+                if "images" in message_data and message_data["images"]:
+                    message.images = message_data["images"]
+                
+                # 保存到数据库
+                db.add(message)
+                db.commit()
+                return message.id
+        except Exception as e:
+            logging.error(f"添加消息失败: {e}")
+            return None
+
+    def save_audio_segments(self, message_id, segments):
+        """保存音频段落到 audio_segments 表"""
+        try:
+            # 使用导入的 AudioSegment 模型
+            with self.get_db() as db:
+                # 清除现有段落
+                db.query(AudioSegment).filter(AudioSegment.message_id == message_id).delete()
+                
+                # 添加新段落
+                for segment in segments:
+                    seg = AudioSegment(
+                        message_id=message_id,
+                        path=segment.get("path"),
+                        segment_index=segment.get("segment_index", 0),
+                        sample_rate=segment.get("sample_rate"),
+                        duration=segment.get("duration")
+                    )
+                    db.add(seg)
+                
+                db.commit()
+                logging.info(f"为消息 {message_id} 保存了 {len(segments)} 个音频段落")
+                return True
+        except Exception as e:
+            logging.error(f"保存音频段落失败: {str(e)}")
+            return False
+
+    def update_message_audio_path(self, message_id, audio_path):
+        """更新消息的音频路径"""
+        try:
+            with self.get_db() as db:
+                # 查找消息
+                message = db.query(Message).filter(Message.message_id == message_id).first()
+                
+                # 如果找不到，尝试作为数字ID查找
+                if not message and message_id.isdigit():
+                    message = db.query(Message).filter(Message.id == int(message_id)).first()
+                
+                if not message:
+                    logging.error(f"未找到消息 {message_id}")
+                    return False
+                
+                # 检查 audio_path 属性是否存在
+                if not hasattr(message, 'audio_path'):
+                    logging.error(f"Message 对象没有 audio_path 属性，需要更新数据库模型")
+                    # 尝试使用通用方法更新
+                    try:
+                        # 使用 __setattr__ 方法设置属性（即使模型中没有定义）
+                        setattr(message, 'audio_path', audio_path)
+                        db.commit()
+                        logging.info(f"已通过动态属性设置音频路径: {audio_path}")
+                        return True
+                    except Exception as e:
+                        logging.error(f"动态设置属性失败: {e}")
+                        return False
+                
+                # 正常更新音频路径
+                old_path = getattr(message, 'audio_path', None)
+                message.audio_path = audio_path
+                db.commit()
+                
+                logging.info(f"音频路径已更新: {old_path} -> {audio_path}")
+                return True
+        except Exception as e:
+            logging.error(f"更新消息音频路径失败: {str(e)}")
+            logging.error(traceback.format_exc())
+            return False
+        
+    def save_merged_audio(self, merged_audio):
+        """保存合并音频记录
+        
+        Args:
+            merged_audio: 包含合并音频信息的字典
+        """
+        try:
+            # 导入 MergedAudio 模型 - 确保已创建此模型
+            from models.audio import MergedAudio
+            
+            with self.get_db() as db:
+                # 创建新记录
+                record = MergedAudio(
+                    message_id=merged_audio["message_id"],
+                    path=merged_audio["path"],
+                    sample_rate=merged_audio.get("sample_rate", 24000),
+                    duration=merged_audio.get("duration", 0),
+                    segments_count=merged_audio.get("segments_count", 0)
+                )
+                
+                # 保存到数据库
+                db.add(record)
+                db.commit()
+                
+                logging.info(f"已保存合并音频记录: 消息ID={merged_audio['message_id']}, 路径={merged_audio['path']}")
+                return True
+        except Exception as e:
+            logging.error(f"保存合并音频记录失败: {str(e)}")
+            logging.error(traceback.format_exc())
+            return False

@@ -11,6 +11,11 @@ import sqlite3
 import logging
 from datetime import datetime
 from models.database_models import init_db, Message, AudioSegment, MergedAudio
+from sqlalchemy import create_engine
+from models.message import Base as MessageBase
+from models.audio import Base as AudioBase
+import config
+from models.base import Base
 
 # 配置日志
 logging.basicConfig(
@@ -158,6 +163,20 @@ def migrate_data(old_db_path, new_db_path):
         logger.error(traceback.format_exc())
         return False
 
+def rebuild_database():
+    """重建数据库表"""
+    # 确保数据目录存在
+    os.makedirs(os.path.dirname(config.DATABASE_PATH), exist_ok=True)
+    
+    # 创建数据库引擎
+    engine = create_engine(f"sqlite:///{config.DATABASE_PATH}")
+    
+    # 删除并重建表
+    Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
+    
+    print(f"数据库表已重建: {config.DATABASE_PATH}")
+
 def main():
     """主函数"""
     # 数据库路径
@@ -185,4 +204,4 @@ def main():
     logger.info("数据库重建完成")
 
 if __name__ == "__main__":
-    main() 
+    rebuild_database() 
