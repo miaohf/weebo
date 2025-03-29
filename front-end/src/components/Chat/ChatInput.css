@@ -1,0 +1,135 @@
+.chat-input {
+  width: 100%;
+}
+
+.chat-input form {
+  width: 100%;
+}
+
+.chat-input-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  position: relative;
+}
+
+.mode-toggle-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: var(--primary-light);
+  color: var(--primary);
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+}
+
+.mode-toggle-button:hover {
+  background-color: var(--primary-lighter);
+}
+
+.mode-toggle-button:active {
+  transform: scale(0.95);
+}
+
+.mode-toggle-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.chat-input textarea {
+  flex: 1;
+  min-height: 40px;
+  max-height: 120px;
+  padding: 10px 15px;
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  resize: none;
+  font-family: inherit;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  background-color: var(--bg-light);
+  transition: border-color 0.2s ease;
+  outline: none;
+}
+
+.chat-input textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-lightest);
+}
+
+.send-button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 20px;
+  background-color: var(--primary);
+  color: white;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.send-button:hover {
+  background-color: var(--primary-dark);
+}
+
+.send-button:disabled {
+  background-color: var(--gray-light);
+  cursor: not-allowed;
+}
+
+.record-button {
+  flex: 1;
+  height: 44px;
+  background-color: var(--bg-light);
+  border: 1px solid var(--border-color);
+  border-radius: 22px;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.record-button.recording {
+  background-color: rgba(255, 0, 0, 0.1);
+  border-color: var(--danger);
+  color: var(--danger);
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.98);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+  100% {
+    transform: scale(0.98);
+  }
+}
+
+@media (max-width: 768px) {
+  .mode-toggle-button,
+  .send-button {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .send-button span {
+    display: none;
+  }
+} 

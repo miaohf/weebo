@@ -1,7 +1,7 @@
 """Main entry point for the assistant API server."""
 import signal
 import asyncio
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File, Form, Request, Body
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File, Form, Request, Body, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from typing import Optional
@@ -28,6 +28,7 @@ import os
 import hashlib
 from datetime import datetime
 import sqlite3
+import wave
 
 # 设置日志
 logging.basicConfig(level=logging.INFO)
@@ -157,7 +158,10 @@ class Assistant:
                     "sample_rate": sample_rate
                 }
             
+            # 修改返回格式，增加顶层 english 和 chinese 字段
             return {
+                "english": display_message["english"],  # 添加到顶层
+                "chinese": display_message["chinese"],  # 添加到顶层
                 "text": display_message,
                 "audio": audio_data,
                 "status": "success"
@@ -167,11 +171,12 @@ class Assistant:
             error(f"Error in text processing: {e}")
             import traceback
             debug(f"Exception details: {traceback.format_exc()}")
-            return {
+            error_response = {
                 "english": "I'm sorry, I encountered an error while processing your request.",
                 "chinese": "抱歉，处理您的请求时遇到错误。",
                 "display": "I'm sorry, I encountered an error while processing your request.\n\n抱歉，处理您的请求时遇到错误。"
             }
+            return error_response
 
     async def process_voice_input(self, audio_data: bytes, sample_rate: int = 16000, speaker: str = 'default'):
         """Process voice input and return response."""
@@ -370,21 +375,36 @@ async def conversation(
         error(f"Conversation error: {e}")
         return {"error": str(e)}
 
-@app.post("/api/send_message")
-async def send_message(request: TextMessageRequest):
-    """处理文本消息的HTTP API端点"""
-    print(f"收到HTTP文本消息请求: {request.message[:50]}...")
+# @app.post("/api/send_message")
+# async def send_message(request: TextMessageRequest):
+#     """处理文本消息的HTTP API端点"""
+#     print(f"收到HTTP文本消息请求: {request.message[:50]}...")
     
-    try:
-        # 使用现有的处理逻辑
-        response = await assistant.process_text_input(request.message, None, request.speaker)
-        print("生成的响应:", response)  # 添加日志
-        return response
-    except Exception as e:
-        import traceback
-        error_details = traceback.format_exc()
-        print(f"处理消息错误: {e}\n{error_details}")
-        return {"error": f"处理消息失败: {str(e)}"}
+#     try:
+#         # 使用现有的处理逻辑
+#         response = await assistant.process_text_input(request.message, None, request.speaker)
+#         print("生成的响应:", response)  # 添加日志
+        
+#         # 确保响应包含顶层english和chinese字段
+#         if "english" not in response or "chinese" not in response:
+#             if "text" in response and isinstance(response["text"], dict):
+#                 response["english"] = response["text"].get("english", "")
+#                 response["chinese"] = response["text"].get("chinese", "")
+#             else:
+#                 # 设置默认值
+#                 response["english"] = "Response text not available."
+#                 response["chinese"] = "无法获取响应文本。"
+        
+#         return response
+#     except Exception as e:
+#         import traceback
+#         error_details = traceback.format_exc()
+#         print(f"处理消息错误: {e}\n{error_details}")
+#         return {
+#             "error": f"处理消息失败: {str(e)}",
+#             "english": "I'm sorry, an error occurred while processing your request.",
+#             "chinese": "抱歉，处理请求时发生错误。"
+#         }
 
 @app.get("/sessions")
 async def get_sessions():
@@ -392,82 +412,84 @@ async def get_sessions():
     return assistant.db_service.get_session_history()
 
 # 添加流式TTS端点
-@app.post("/stream_tts")
-async def stream_tts(request: StreamAudioRequest):
-    """处理流式TTS请求，逐段返回音频数据"""
-    try:
-        # 显示用户消息到日志
-        user_message(request.message)
+# @app.post("/stream_tts")
+# async def stream_tts(request: StreamAudioRequest):
+#     """处理流式TTS请求，逐段返回音频数据"""
+#     try:
+#         # 显示用户消息到日志
+#         user_message(request.message)
         
-        # 保存用户消息
-        assistant.db_service.save_message("user", request.message)
+#         # 保存用户消息
+#         assistant.db_service.save_message("user", request.message)
         
-        # 获取LLM响应
-        response_data = assistant.llm_service.get_response(request.message)
+#         # 获取LLM响应
+#         response_data = assistant.llm_service.get_response(request.message)
         
-        if not response_data:
-            return {"error": "Failed to get response from LLM"}
+#         if not response_data:
+#             return {"error": "Failed to get response from LLM"}
         
-        # 显示助手消息
-        display_message = {
-            "english": response_data["english"],
-            "chinese": response_data["chinese"]
-        }
-        assistant_message(display_message)
+#         # 显示助手消息
+#         display_message = {
+#             "english": response_data["english"],
+#             "chinese": response_data["chinese"]
+#         }
+#         assistant_message(display_message)
         
-        # 保存助手消息
-        assistant.db_service.save_message("assistant", display_message)
+#         # 保存助手消息
+#         assistant.db_service.save_message("assistant", display_message)
         
-        # 设置TTS的speaker
-        assistant.tts_model.set_speaker(request.speaker)
+#         # 设置TTS的speaker
+#         assistant.tts_model.set_speaker(request.speaker)
         
-        # 分割文本为多个段落
-        text_segments = assistant.split_into_chunks(response_data["english"])
+#         # 分割文本为多个段落
+#         text_segments = assistant.split_into_chunks(response_data["english"])
         
-        # 使用StreamingResponse返回逐段处理的音频
-        async def generate_audio_stream():
-            # 首先返回文本响应
-            text_response = {
-                "type": "text",
-                "text": display_message
-            }
-            yield json.dumps(text_response) + "\n"
+#         # 使用StreamingResponse返回逐段处理的音频
+#         async def generate_audio_stream():
+#             # 首先返回文本响应
+#             text_response = {
+#                 "type": "text",
+#                 "text": display_message
+#             }
+#             yield json.dumps(text_response) + "\n"
             
-            # 逐段处理音频
-            for i, segment in enumerate(text_segments):
-                audio_data = await assistant.tts_model.generate_audio_segment(segment)
+#             # 逐段处理音频
+#             for i, segment in enumerate(text_segments):
+#                 audio_data = await assistant.tts_model.generate_audio_segment(segment)
                 
-                # 如果生成成功，返回音频段
-                if audio_data:
-                    segment_response = {
-                        "type": "audio_segment",
-                        "segment_index": i,
-                        "total_segments": len(text_segments),
-                        "text": segment,
-                        "audio": {
-                            "audio": audio_data[0].tolist() if hasattr(audio_data[0], 'tolist') else audio_data[0],
-                            "sample_rate": audio_data[1]
-                        }
-                    }
-                    yield json.dumps(segment_response) + "\n"
+#                 # 如果生成成功，返回音频段
+#                 if audio_data:
+#                     segment_response = {
+#                         "type": "audio_segment",
+#                         "segment_index": i,
+#                         "total_segments": len(text_segments),
+#                         "text": segment,
+#                         "audio": {
+#                             "audio": audio_data[0].tolist() if hasattr(audio_data[0], 'tolist') else audio_data[0],
+#                             "sample_rate": audio_data[1]
+#                         }
+#                     }
+#                     yield json.dumps(segment_response) + "\n"
         
-        return StreamingResponse(
-            generate_audio_stream(),
-            media_type="application/x-ndjson"
-        )
+#         return StreamingResponse(
+#             generate_audio_stream(),
+#             media_type="application/x-ndjson"
+#         )
         
-    except Exception as e:
-        error(f"Stream TTS error: {e}")
-        import traceback
-        debug(f"Exception details: {traceback.format_exc()}")
-        return {"error": str(e)}
+#     except Exception as e:
+#         error(f"Stream TTS error: {e}")
+#         import traceback
+#         debug(f"Exception details: {traceback.format_exc()}")
+#         return {"error": str(e)}
 
 @app.post("/chat")
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, background_tasks: BackgroundTasks):
     """处理聊天请求，先返回文本，再流式返回TTS音频"""
     try:
         # 记录用户消息
         user_message(request.message)
+        
+        # 保存用户消息
         assistant.db_service.save_message("user", request.message)
         
         # 获取LLM响应
@@ -488,8 +510,13 @@ async def chat(request: ChatRequest):
         debug(f"已保存助手消息，ID: {assistant_message_id}")
         
         # 如果不需要音频，直接返回文本响应
+        # print(f"request.stream_audio: {request.stream_audio}")
         if not request.stream_audio:
-            return {"message": display_message}
+            return {
+                "english": display_message["english"], 
+                "chinese": display_message["chinese"],
+                "message": display_message
+            }
         
         # 分割文本为段落（仅对英文文本处理，因为TTS通常使用英文文本）
         text_segments = split_text_into_segments(response_data["english"])
@@ -498,158 +525,158 @@ async def chat(request: ChatRequest):
         debug(f"文本分为{total_segments}个段落用于TTS处理")
         
         # 创建流式响应生成器
-        async def generate_response_stream():
-            # 生成消息ID
-            message_id = str(uuid.uuid4())
-            # 保存助手消息
-            assistant.db_service.save_message_with_audio(
-                "assistant", 
-                display_message, 
-                message_id,
-                []  # 初始为空音频列表
-            )
-            
-            # 首先发送文本响应
+        async def generate_response_stream(text_segments: list[str]):
+            # 直接返回文本响应
             text_response = {
                 "type": "text",
-                "message_id": message_id,
-                "content": display_message
+                "message_id": assistant_message_id,
+                "content": {
+                    "english": display_message["english"],
+                    "chinese": display_message["chinese"],
+                },
+                "text": display_message
             }
+            yield json.dumps(text_response) + "\n"
             
-            # 打印文本响应报文
-            text_response_json = json.dumps(text_response)
-            print("\n=== 文本响应报文 ===")
-            print(text_response_json)
-            print("=== 文本响应报文结束 ===\n")
+            # 设置TTS的speaker
+            assistant.tts_model.set_speaker(request.speaker)
             
-            yield text_response_json + "\n"
-            
-            # 记录消息ID用于关联音频
-            message_id = text_response["message_id"]
-            debug(f"生成流式响应message_id: {message_id}")
-            
-            # 定义音频路径列表
+            # 准备存储音频段落路径的列表
             audio_paths = []
             
-            # 逐段处理TTS
+            # 逐段处理音频
             for i, segment in enumerate(text_segments):
                 try:
-                    debug(f"处理第{i+1}/{total_segments}段音频")
+                    # 生成音频
+                    audio_response = await assistant.tts_model.generate_audio_segment(segment)
                     
-                    # 获取TTS音频数据
-                    tts_response = await request_tts_for_segment(segment, request.speaker)
-                    
-                    # 保存音频文件到磁盘
-                    file_hash = hashlib.md5(f"{message_id}_{i}_{segment}".encode()).hexdigest()
-                    audio_filename = f"{file_hash}.wav"
-                    audio_path = os.path.join(AUDIO_STORAGE_DIR, audio_filename)
-                    
-                    # 解码Base64为二进制
-                    audio_binary = base64.b64decode(tts_response["audio_data"])
-                    
-                    # 保存到文件
-                    with open(audio_path, "wb") as f:
-                        f.write(audio_binary)
-                    
-                    # 添加到路径列表
-                    audio_paths.append({
-                        "path": audio_filename,
-                        "segment_index": i,
-                        "text": segment,
-                        "sample_rate": tts_response["sample_rate"]
-                    })
-                    
-                    # 音频响应保持不变...
-                    audio_response = {
-                        "type": "audio",
-                        "message_id": message_id,
-                        "segment_index": i,
-                        "total_segments": total_segments,
-                        "text": segment,
-                        "audio_data": tts_response["audio_data"],
-                        "sample_rate": tts_response["sample_rate"],
-                        "format": "base64"
-                    }
-                    yield json.dumps(audio_response) + "\n"
-                    
-                except Exception as e:
-                    error(f"音频处理错误: {e}")
-                    error_response = {
-                        "type": "error",
-                        "message_id": message_id,
-                        "segment_index": i,
-                        "message": str(e)
-                    }
-                    
-                    # 打印错误响应
-                    print("\n=== 错误响应报文 ===")
-                    print(json.dumps(error_response))
-                    print("=== 错误响应报文结束 ===\n")
-                    
-                    yield json.dumps(error_response) + "\n"
-            
-            # 音频段处理完毕后，合并所有音频
-            if audio_paths:
-                try:
-                    # 创建合并后的音频文件名
-                    merged_filename = f"{message_id}_merged.wav"
-                    merged_path = os.path.join(AUDIO_STORAGE_DIR, merged_filename)
-                    
-                    # 合并音频文件
-                    combined = None
-                    sample_rate = None
-                    
-                    # 按段落索引排序
-                    sorted_paths = sorted(audio_paths, key=lambda x: x["segment_index"])
-                    
-                    for segment_info in sorted_paths:
-                        segment_path = os.path.join(AUDIO_STORAGE_DIR, segment_info["path"])
-                        if os.path.exists(segment_path):
-                            segment_audio = AudioSegment.from_file(segment_path)
+                    if audio_response:
+                        audio_data, sample_rate = audio_response
+                        
+                        # 修复点：移除冗余的缩放转换
+                        wav_buffer = io.BytesIO()
+                        with wave.open(wav_buffer, 'wb') as wave_file:
+                            wave_file.setnchannels(1)
+                            wave_file.setframerate(sample_rate)
+                            wave_file.setsampwidth(2)
                             
-                            if combined is None:
-                                combined = segment_audio
-                                sample_rate = segment_info.get("sample_rate", 24000)
+                            # 改进验证逻辑
+                            if isinstance(audio_data, np.ndarray):
+                                # 自动处理数据类型转换
+                                if audio_data.dtype == np.float32:
+                                    # 浮点型需要先归一化再转int16
+                                    audio_data = np.clip(audio_data, -1.0, 1.0)
+                                    audio_data = (audio_data * 32767).astype(np.int16)
+                                elif audio_data.dtype != np.int16:
+                                    raise ValueError(f"不支持的音频数据类型: {audio_data.dtype}")
+                                    
+                                audio_bytes = audio_data.tobytes()
                             else:
-                                combined += segment_audio
-                    
-                    # 保存合并后的音频
-                    if combined:
-                        combined.export(merged_path, format="wav")
-                        debug(f"已合并音频保存到: {merged_path}")
+                                raise ValueError("音频数据必须为numpy数组")
+
+                            wave_file.writeframes(audio_bytes)
                         
-                        # 添加合并音频信息到消息
-                        merged_info = {
-                            "merged_path": merged_filename,
+                        wav_bytes = wav_buffer.getvalue()
+                        base64_audio_data = base64.b64encode(wav_bytes).decode('utf-8')
+                        
+                        # 保存文件时增加校验
+                        if len(wav_bytes) < 100:  # WAV文件头至少44字节
+                            error(f"生成的音频文件过小: {len(wav_bytes)}字节")
+                            continue
+                        
+                        segment_filename = f"{assistant_message_id}_{i}.wav"
+                        segment_path = os.path.join(AUDIO_STORAGE_DIR, segment_filename)
+                        
+                        with open(segment_path, "wb") as f:
+                            f.write(wav_bytes)
+                        
+                        # 添加文件验证
+                        try:
+                            with wave.open(segment_path) as test_file:
+                                if test_file.getnframes() == 0:
+                                    error("保存的音频文件帧数为空")
+                        except Exception as e:
+                            error(f"音频文件校验失败: {e}")
+                        
+                        audio_paths.append({
+                            "segment_index": i,
+                            "path": segment_filename,
                             "sample_rate": sample_rate
-                        }
+                        }) 
                         
-                        # 使用ORM方法更新音频信息
-                        result = assistant.db_service.update_message_audio(message_id, audio_paths, merged_info)
-                        if result:
-                            debug(f"已更新消息音频信息: assistant-{message_id}")
+                        # 返回音频段落
+                        segment_response = {
+                            "type": "audio",
+                            "message_id": assistant_message_id,
+                            "segment_index": i,
+                            "total_segments": total_segments,
+                            "audio_data": base64_audio_data,  # 使用WAV格式的Base64数据
+                            "format": "wav",
+                            "sample_rate": sample_rate,
+                            "english": display_message["english"],
+                            "chinese": display_message["chinese"]
+                        }
+                        yield json.dumps(segment_response) + "\n"  # 返回JSON字符串，不是JSONResponse对象
+                        
                 except Exception as e:
-                    error(f"合并音频失败: {e}")
+                    error(f"处理音频段落{i}时出错: {e}")
                     import traceback
                     error(traceback.format_exc())
+                    # 继续处理下一个段落，不中断
             
-            # 发送完成信号
-            completion_response = {
-                "type": "audio_complete",
-                "message_id": message_id,
-                "total_segments": total_segments
-            }
+            print(f"audio_paths: {audio_paths}")
+            # 更新消息记录的音频路径
+            if audio_paths:
+                try:
+                    import soundfile as sf
+                    
+                    # 按顺序读取所有分段音频
+                    audio_segments = []
+                    for seg in sorted(audio_paths, key=lambda x: x["segment_index"]):
+                        file_path = os.path.join(AUDIO_STORAGE_DIR, seg["path"])
+                        data, _ = sf.read(file_path)  # 自动处理格式
+                        audio_segments.append(data)
+                    
+                    # 合并并保存
+                    if audio_segments:
+                        combined_filename = f"{assistant_message_id}.wav"
+                        combined_path = os.path.join(AUDIO_STORAGE_DIR, combined_filename)
+                        
+                        # 合并成一个numpy数组
+                        full_audio = np.concatenate(audio_segments)
+                        
+                        # 用第一个分段的参数保存（假设参数一致）
+                        sf.write(
+                            combined_path,
+                            full_audio,
+                            audio_paths[0]["sample_rate"],
+                            subtype='PCM_16'
+                        )
+                        
+                        # 更新元数据
+                        assistant.update_message_audio(
+                            assistant_message_id,
+                            audio_paths,
+                            combined_filename
+                        )
+                        
+                except Exception as e:
+                    error(f"音频合并失败: {str(e)}")
             
-            # 打印完成响应
-            print("\n=== 完成响应报文 ===")
-            print(json.dumps(completion_response))
-            print("=== 完成响应报文结束 ===\n")
-            
-            yield json.dumps(completion_response) + "\n"
-        
+            # # 完成消息
+            # completion_response = {
+            #     "type": "completion",
+            #     "message_id": assistant_message_id,
+            #     "content": {
+            #         "english": display_message["english"],
+            #         "chinese": display_message["chinese"]
+            #     }
+            # }
+            # yield json.dumps(completion_response) + "\n"  # 返回JSON字符串，不是JSONResponse对象
+
         # 返回流式响应
         return StreamingResponse(
-            generate_response_stream(),
+            generate_response_stream(text_segments),
             media_type="application/x-ndjson"
         )
         
@@ -659,78 +686,82 @@ async def chat(request: ChatRequest):
         debug(f"异常详情: {traceback.format_exc()}")
         return JSONResponse(
             status_code=500,
-            content={"error": str(e)}
+            content={
+                "error": str(e),
+                "english": "I'm sorry, an error occurred while processing your request.",
+                "chinese": "抱歉，处理请求时发生错误。"
+            }
         )
 
-# 添加缺失的/tts_stream端点
-@app.post("/tts_stream")
-async def tts_stream(request: StreamTTSRequest):
-    """流式处理TTS请求，逐段返回音频数据"""
-    try:
-        # 文本内容
-        text = request.text
+# # 添加缺失的/tts_stream端点
+# @app.post("/tts_stream")
+# async def tts_stream(request: StreamTTSRequest):
+#     """流式处理TTS请求，逐段返回音频数据"""
+#     try:
+#         # 文本内容
+#         text = request.text
         
-        # 分割文本为段落
-        text_segments = split_text_into_segments(text)
-        total_segments = len(text_segments)
+#         # 分割文本为段落
+#         text_segments = split_text_into_segments(text)
+#         total_segments = len(text_segments)
         
-        debug(f"文本被分为{total_segments}个段落进行处理")
+#         debug(f"文本被分为{total_segments}个段落进行处理")
         
-        # 创建流式响应生成器
-        async def generate_audio_stream():
-            # 首先返回文本和分段信息
-            info_response = {
-                "type": "info",
-                "total_segments": total_segments,
-                "text": text
-            }
-            yield json.dumps(info_response) + "\n"
+#         # 创建流式响应生成器
+#         async def generate_audio_stream():
+#             # 首先返回文本和分段信息
+#             info_response = {
+#                 "type": "info",
+#                 "total_segments": total_segments,
+#                 "text": text
+#             }
+#             yield json.dumps(info_response) + "\n"
             
-            # 逐段处理文本并返回音频
-            for i, segment in enumerate(text_segments):
-                try:
-                    debug(f"处理第{i+1}段文本：{segment[:30]}...")
+#             # 逐段处理文本并返回音频
+#             for i, segment in enumerate(text_segments):
+#                 try:
+#                     debug(f"处理第{i+1}段文本：{segment[:30]}...")
                     
-                    # 调用TTS服务器处理此段
-                    tts_response = await request_tts_for_segment(segment, request.speaker)
+#                     # 调用TTS服务器处理此段
+#                     tts_response = await request_tts_for_segment(segment, request.speaker)
                     
-                    # 构造段落响应
-                    segment_response = {
-                        "type": "audio_segment",
-                        "segment_index": i,
-                        "total_segments": total_segments,
-                        "text": segment,
-                        "audio_data": tts_response["audio_data"],
-                        "sample_rate": tts_response["sample_rate"],
-                        "format": "base64"
-                    }
+#                     # 构造段落响应
+#                     segment_response = {
+#                         "type": "audio_segment",
+#                         "segment_index": i,
+#                         "total_segments": total_segments,
+#                         "text": segment,
+#                         "audio_data": tts_response["audio_data"],
+#                         "sample_rate": tts_response["sample_rate"],
+#                         "format": "base64"
+#                     }
                     
-                    yield json.dumps(segment_response) + "\n"
-                    debug(f"第{i+1}段文本音频已生成")
+#                     yield json.dumps(segment_response) + "\n"
+#                     debug(f"第{i+1}段文本音频已生成")
                     
-                except Exception as e:
-                    error(f"处理第{i+1}段时出错: {e}")
-                    error_response = {
-                        "type": "error",
-                        "segment_index": i,
-                        "message": str(e)
-                    }
-                    yield json.dumps(error_response) + "\n"
+#                 except Exception as e:
+#                     error(f"处理第{i+1}段时出错: {e}")
+#                     error_response = {
+#                         "type": "error",
+#                         "segment_index": i,
+#                         "message": str(e)
+#                     }
+#                     yield json.dumps(error_response) + "\n"
         
-        # 返回流式响应
-        return StreamingResponse(
-            generate_audio_stream(),
-            media_type="application/x-ndjson"
-        )
+#         # 返回流式响应
+#         return StreamingResponse(
+#             generate_audio_stream(),
+#             media_type="application/x-ndjson"
+#         )
         
-    except Exception as e:
-        error(f"流式TTS处理出错: {e}")
-        import traceback
-        debug(f"异常详情: {traceback.format_exc()}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": str(e)}
-        )
+#     except Exception as e:
+#         error(f"流式TTS处理出错: {e}")
+#         import traceback
+#         debug(f"异常详情: {traceback.format_exc()}")
+#         return JSONResponse(
+#             status_code=500,
+#             content={"error": str(e)}
+#         )
 
 # 辅助函数：将文本分割为合适的段落
 def split_text_into_segments(text, max_length=250):
@@ -869,6 +900,7 @@ async def get_audio(request: GetAudioRequest):
         
         # 从数据库获取消息，使用增强的查询方法
         message = assistant.db_service.get_message_by_flexible_id(message_id)
+        print(f"message: {message}")
         
         if not message:
             raise HTTPException(status_code=404, detail="未找到消息")
@@ -967,7 +999,7 @@ async def get_audio(request: GetAudioRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/debug/messages")
-async def debug_messages():
+async def debug_messages(Message):
     """列出数据库中的所有消息记录及其ID"""
     try:
         messages = []
@@ -1006,6 +1038,24 @@ async def startup_event():
     assistant.db_service.ensure_consistent_message_ids()
     
     print("=== 服务启动完成 ===\n")
+
+@app.middleware("http")
+async def add_required_fields(request: Request, call_next):
+    try:
+        response = await call_next(request)
+        return response
+    except Exception as e:
+        error(f"请求处理错误: {e}")
+        import traceback
+        error(traceback.format_exc())
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": str(e),
+                "english": "I'm sorry, an error occurred while processing your request.",
+                "chinese": "抱歉，处理请求时发生错误。"
+            }
+        )
 
 def main():
     """Main entry point."""

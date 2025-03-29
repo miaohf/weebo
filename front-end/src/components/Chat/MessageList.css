@@ -1,0 +1,92 @@
+.message-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  overflow-y: auto;
+  flex: 1;
+  height: 100%;
+}
+
+/* 确保最后一条消息显示时有足够的底部空间 */
+.message-list::after {
+  content: "";
+  display: block;
+  min-height: 20px;
+}
+
+.message-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.message-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.message-list::-webkit-scrollbar-thumb {
+  background-color: var(--gray-300);
+  border-radius: 3px;
+}
+
+.empty-chat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  color: var(--gray-500);
+  text-align: center;
+  padding: var(--spacing-xl);
+}
+
+.empty-chat-icon {
+  font-size: 3rem;
+  margin-bottom: var(--spacing-md);
+  color: var(--gray-300);
+}
+
+.empty-chat h3 {
+  font-weight: 600;
+  font-size: 1.25rem;
+  margin-bottom: var(--spacing-sm);
+}
+
+.empty-chat p {
+  font-size: 0.875rem;
+  max-width: 400px;
+}
+
+/* 日期分隔线 */
+.date-separator {
+  text-align: center;
+  margin: var(--spacing-md) 0;
+  position: relative;
+}
+
+.date-separator::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background-color: var(--border-color);
+  z-index: 1;
+}
+
+.date-separator span {
+  background-color: var(--bg-main);
+  padding: 0 var(--spacing-md);
+  position: relative;
+  z-index: 2;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+  .message-list {
+    padding: var(--spacing-sm);
+    gap: var(--spacing-sm);
+  }
+} 

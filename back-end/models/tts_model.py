@@ -174,6 +174,11 @@ class TextToSpeechModel:
                                 if len(audio_array.shape) > 1 and audio_array.shape[1] > 1:
                                     audio_array = np.mean(audio_array, axis=1)
                                 
+                                # 归一化到 [-1.0, 1.0] 范围
+                                max_val = np.max(np.abs(audio_array))
+                                if max_val > 0:
+                                    audio_array /= max_val
+                                
                                 debug(f"Audio processed successfully: shape={audio_array.shape}, sr={samplerate}")
                                 # Return both the audio array and the sample rate
                                 return (audio_array, samplerate)
@@ -194,59 +199,59 @@ class TextToSpeechModel:
             debug(f"Exception details: {traceback.format_exc()}")
             return None
     
-    def generate_audio_sync(self, text):
-        """Generate audio synchronously."""
-        if not text or not text.strip():
-            return None
+    # def generate_audio_sync(self, text):
+    #     """Generate audio synchronously."""
+    #     if not text or not text.strip():
+    #         return None
             
-        text = ' '.join(text.split())
+    #     text = ' '.join(text.split())
         
-        request_data = {
-            "text": text,
-            "model_type": "Transformer",
-            "language": "en-us",
-            "speaker": self.speaker,
-            "cfg_scale": 2.0,
-            "min_p": 0.1,
-            "seed": 421
-        }
+    #     request_data = {
+    #         "text": text,
+    #         "model_type": "Transformer",
+    #         "language": "en-us",
+    #         "speaker": self.speaker,
+    #         "cfg_scale": 2.0,
+    #         "min_p": 0.1,
+    #         "seed": 421
+    #     }
         
-        try:
-            response = requests.post(
-                self.api_url,
-                json=request_data,
-                timeout=30
-            )
+    #     try:
+    #         response = requests.post(
+    #             self.api_url,
+    #             json=request_data,
+    #             timeout=30
+    #         )
             
-            if response.status_code == 200:
-                audio_data = response.content
+    #         if response.status_code == 200:
+    #             audio_data = response.content
                 
-                # Save audio for debugging
-                os.makedirs('tmp', exist_ok=True)
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-                audio_filename = f'tmp/audio_{timestamp}.wav'
-                with open(audio_filename, 'wb') as f:
-                    f.write(audio_data)
+    #             # Save audio for debugging
+    #             os.makedirs('tmp', exist_ok=True)
+    #             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    #             audio_filename = f'tmp/audio_{timestamp}.wav'
+    #             with open(audio_filename, 'wb') as f:
+    #                 f.write(audio_data)
                 
-                # Process audio data
-                with io.BytesIO(audio_data) as audio_io:
-                    audio_array, samplerate = sf.read(audio_io)
+    #             # Process audio data
+    #             with io.BytesIO(audio_data) as audio_io:
+    #                 audio_array, samplerate = sf.read(audio_io)
                     
-                    # Ensure audio is float32
-                    if audio_array.dtype != np.float32:
-                        audio_array = audio_array.astype(np.float32)
+    #                 # Ensure audio is float32
+    #                 if audio_array.dtype != np.float32:
+    #                     audio_array = audio_array.astype(np.float32)
                     
-                    # If audio is stereo, convert to mono
-                    if len(audio_array.shape) > 1 and audio_array.shape[1] > 1:
-                        audio_array = np.mean(audio_array, axis=1)
+    #                 # If audio is stereo, convert to mono
+    #                 if len(audio_array.shape) > 1 and audio_array.shape[1] > 1:
+    #                     audio_array = np.mean(audio_array, axis=1)
                     
-                    return audio_array
-            else:
-                error(f"generate_audio_sync API request failed: {response.status_code}")
-                return None
-        except Exception as e:
-            error(f"Failed to generate audio via API: {e}")
-            return None
+    #                 return audio_array
+    #         else:
+    #             error(f"generate_audio_sync API request failed: {response.status_code}")
+    #             return None
+    #     except Exception as e:
+    #         error(f"Failed to generate audio via API: {e}")
+    #         return None
     
     def generate_audio_local(self, text, voice, speed):
         """Generate audio using local model."""

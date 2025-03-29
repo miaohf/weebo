@@ -1,0 +1,196 @@
+.dropdown-container {
+  position: relative;
+}
+
+.dropdown-trigger {
+  background: transparent;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.dropdown-trigger:hover {
+  background-color: var(--gray-200);
+}
+
+.dropdown-trigger.active {
+  background-color: var(--gray-200);
+}
+
+.dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.dots::before,
+.dots::after {
+  content: "";
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background-color: var(--gray-700);
+}
+
+.dots {
+  position: relative;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background-color: var(--gray-700);
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 220px;
+  max-width: calc(100vw - 20px);
+  background-color: var(--bg-main);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--shadow-lg);
+  z-index: 100;
+  overflow: hidden;
+  animation: dropdown-fade 0.2s ease;
+  border: 1px solid var(--border-color);
+}
+
+@keyframes dropdown-fade {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 10px 16px;
+  border: none;
+  background-color: transparent;
+  text-align: left;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.dropdown-item:hover:not(:disabled) {
+  background-color: var(--gray-100);
+}
+
+.dropdown-item:disabled {
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}
+
+.dropdown-item.active {
+  font-weight: 500;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background-color: var(--border-color);
+  margin: 6px 0;
+}
+
+.dropdown-item-icon {
+  margin-right: 10px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dropdown-item-text {
+  flex: 1;
+}
+
+.dropdown-item-check {
+  margin-left: 8px;
+  color: var(--primary-color);
+}
+
+/* 主题选择子菜单 */
+.theme-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 16px;
+}
+
+.theme-option {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  overflow: hidden;
+  transition: all var(--transition-fast);
+}
+
+.theme-option.active {
+  border-color: var(--primary-color);
+  transform: scale(1.1);
+}
+
+.theme-option:hover {
+  transform: scale(1.1);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .dropdown-menu {
+    width: 90vw;
+    max-width: 320px;
+  }
+}
+
+/* 添加这些样式到现有的CSS文件 */
+
+.dropdown-submenu {
+  padding: 8px 0;
+}
+
+.dropdown-submenu-header {
+  display: flex;
+  align-items: center;
+  padding: 6px 16px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.dropdown-submenu-content {
+  margin-top: 4px;
+  padding-left: 12px;
+}
+
+.color-option {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  margin-right: 10px;
+}
+
+.dropdown-item.danger {
+  color: var(--error);
+}
+
+.dropdown-item.danger:hover {
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+/* 修复移动设备上的定位问题 */
+@media (max-width: 480px) {
+  .dropdown-menu {
+    right: -10px;
+  }
+} 

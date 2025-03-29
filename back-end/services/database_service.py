@@ -103,6 +103,8 @@ class DatabaseService:
     
     def update_message_audio(self, message_id, audio_paths, merged_info):
         """更新消息的音频信息"""
+
+        print(f"message_id, audio_paths, merged_info: {message_id}, {audio_paths}, {merged_info}")
         try:
             with self.SessionLocal() as db:
                 # 尝试多种方式查找消息

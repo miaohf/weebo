@@ -35,3 +35,7 @@ kokoro-v0_19.onnx
 kokoro.onnx
 
 front-end/node_modules/
+back-end/tmp/*
+back-end/logs/*
+back-end/data/messages.db
+back-end/data/audio_cache/*
