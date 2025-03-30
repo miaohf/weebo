@@ -31,7 +31,7 @@ class LLMService:
                 "content": SYSTEM_PROMPT
             }
         ]
-        self.max_history = 50  # 限制历史消息数量，避免超出上下文窗口
+        self.max_history = 10  # 限制历史消息数量，避免超出上下文窗口
         
         # Check available models
         self.available_models = self._get_available_models()
@@ -116,7 +116,6 @@ class LLMService:
         
         # 添加用户消息到历史
         self.add_message("user", user_input)
-        # debug(f"Current conversation history: {self.messages}")
 
         formatted_json = json.dumps(self.messages, indent=4, ensure_ascii=False, sort_keys=True)
         debug(f"Current conversation history: {formatted_json}")
@@ -127,13 +126,11 @@ class LLMService:
 
             # Apply sanitization before further processing
             english_content = self._sanitize_for_tts(english_content)
+
+            # 添加用户消息到历史
+            self.add_message("assistant", english_content)
             
             debug(f"English content: {english_content}")
-            
-            # # 递归解析嵌套的 JSON 字符串
-            # english_content = self._recursively_parse_json(english_content)
-
-            # debug(f"English content after parsing: {english_content}")
             
             # 如果英文内容是字典并包含 english 和 chinese 字段，直接使用
             if isinstance(english_content, dict) and 'english' in english_content and 'chinese' in english_content:
@@ -163,23 +160,6 @@ class LLMService:
             debug(f"Exception details: {traceback.format_exc()}")
             
             return self._get_fallback_response("exception", error=str(e))
-        
-    # def _recursively_parse_json(self, content):
-    #     """递归解析可能嵌套的 JSON 字符串"""
-    #     if not isinstance(content, str):
-    #         return content
-        
-    #     # 尝试解析 JSON
-    #     try:
-    #         parsed = json.loads(content)
-    #         # 如果成功解析，继续递归解析内部可能的 JSON 字符串
-    #         if isinstance(parsed, dict):
-    #             for key, value in parsed.items():
-    #                 parsed[key] = self._recursively_parse_json(value)
-    #         return parsed
-    #     except (json.JSONDecodeError, TypeError):
-    #         # 如果不是有效的 JSON，返回原始内容
-    #         return content
         
     def _get_english_content(self):
         """Get a regular English response from LLM."""
@@ -504,10 +484,10 @@ class LLMService:
         self.messages = valid_messages
         debug(f"Set conversation history with {len(self.messages)} messages")
         
-    def get_messages(self) -> List[Dict[str, str]]:
-        """Get the current conversation history.
+    # def get_messages(self) -> List[Dict[str, str]]:
+    #     """Get the current conversation history.
         
-        Returns:
-            A list of message dictionaries
-        """
-        return self.messages.copy()
+    #     Returns:
+    #         A list of message dictionaries
+    #     """
+    #     return self.messages.copy()

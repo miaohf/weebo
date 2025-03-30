@@ -37,5 +37,5 @@ kokoro.onnx
 front-end/node_modules/
 back-end/tmp/*
 back-end/logs/*
+back-end/audio_cache/*
 back-end/data/messages.db
-back-end/data/audio_cache/*

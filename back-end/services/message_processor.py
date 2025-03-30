@@ -37,7 +37,7 @@ class TextMessageProcessor(BaseMessageProcessor):
         speaker = request.speaker
         stream_audio = request.stream_audio
         
-        # 记录用户消息
+        # 日志打印用户消息
         self.record_user_message(message)
         
         # 保存用户消息
@@ -45,7 +45,6 @@ class TextMessageProcessor(BaseMessageProcessor):
         
         # 获取LLM响应
         response_data = self.assistant.llm_service.get_response(message)
-        # debug(f"LLM response: {response_data}")
         
         # 确保我们有正确的字符串格式，而不是嵌套的 JSON
         english_text = response_data.get("english", "")
@@ -197,7 +196,7 @@ class VoiceMessageProcessor(BaseMessageProcessor):
             )
         
         # 记录用户语音转文本的消息
-        self.record_user_message(f"[语音输入] {transcript}")
+        self.record_user_message(f"[voice] {transcript}")
         
         # 保存用户消息
         self.assistant.db_service.save_message("user", {

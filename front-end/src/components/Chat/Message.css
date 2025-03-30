@@ -76,7 +76,8 @@
 .message-content {
   overflow-wrap: break-word;
   word-break: break-word;
-  padding-right: 32px; /* 为按钮留出空间 */
+  /* 为按钮留出空间 */
+  /* padding-right: 32px;  */
 }
 
 /* Ensure content doesn't overflow */
