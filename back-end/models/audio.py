@@ -22,3 +22,20 @@ class MergedAudio(Base):
     duration = Column(Float, nullable=True)
     segments_count = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.datetime.now) 
+
+    def __repr__(self):
+        return f"<MergedAudio(message_id='{self.path}')>"
+    
+    def to_dict(self):
+        """将模型转换为字典"""
+        result = {
+            "id": self.id,
+            "message_id": self.message_id,
+            "path": self.path,
+            "sample_rate": self.sample_rate,
+            "duration": self.duration,
+            "segments_count": self.segments_count,
+            "created_at": self.created_at.isoformat() if self.created_at else None
+        }
+                    
+        return result 

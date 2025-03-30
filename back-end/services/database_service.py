@@ -10,7 +10,6 @@ from datetime import datetime
 import logging
 import uuid
 import traceback
-from models.message import Message
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +42,7 @@ class DatabaseService:
                 role=role,
                 message_id=message_id,
                 content=json.dumps(content) if not isinstance(content, str) else content,
-                timestamp=datetime.now()
+                created_at=datetime.now()
             )
             
             # 保存到数据库
@@ -74,7 +73,7 @@ class DatabaseService:
                         role=role,
                         message_id=message_id,
                         content=json.dumps(content) if not isinstance(content, str) else content,
-                        timestamp=datetime.now()
+                        created_at=datetime.now()
                     )
                     db.add(message)
                     db.flush()  # 获取ID
@@ -195,7 +194,7 @@ class DatabaseService:
         try:
             with self.get_db() as db:
                 # 确保查询字段与模型定义一致
-                messages = db.query(Message).order_by(Message.timestamp).all()
+                messages = db.query(Message).order_by(Message.created_at).all()
                 
                 # 将查询结果转换为字典列表
                 result = []
@@ -204,7 +203,7 @@ class DatabaseService:
                         "id": msg.id,
                         "role": msg.role,
                         "content": msg.content,
-                        "timestamp": msg.timestamp.isoformat() if msg.timestamp else None
+                        "created_at": msg.created_at.isoformat() if msg.created_at else None
                     }
                     
                     # 添加音频路径（如果存在）
@@ -224,7 +223,7 @@ class DatabaseService:
         try:
             with self.SessionLocal() as db:
                 # 按时间戳排序获取所有消息
-                messages = db.query(Message).order_by(Message.timestamp).all()
+                messages = db.query(Message).order_by(Message.created_at).all()
                 
                 # 转换为字典格式
                 result = []
@@ -254,40 +253,22 @@ class DatabaseService:
             logging.error(traceback.format_exc())
             return False
     
-    def get_message_by_flexible_id(self, message_id):
+    def get_audio_by_message_id(self, message_id):
         """灵活查询消息，尝试多种ID格式"""
         try:
             with self.SessionLocal() as db:
                 # 尝试不同的查询方式
-                message = None
-                
+                # message = None
+                # print(f"message_id: {message_id}")
                 # 1. 直接按message_id查询
-                message = db.query(Message).filter(Message.message_id == message_id).first()
-                if message:
-                    return message.to_dict()
-                    
-                # 2. 尝试key格式查询
-                key = f"assistant-{message_id}"
-                message = db.query(Message).filter(Message.key == key).first()
-                if message:
-                    return message.to_dict()
-                    
-                # 3. 模糊查询包含ID的键
-                message = db.query(Message).filter(Message.key.like(f"%{message_id}%")).first()
-                if message:
-                    return message.to_dict()
-                    
-                # 4. 如果ID包含连字符，尝试只使用第一部分
-                if "-" in message_id:
-                    first_part = message_id.split("-")[0]
-                    message = db.query(Message).filter(
-                        (Message.message_id.like(f"{first_part}%")) |
-                        (Message.key.like(f"%{first_part}%"))
-                    ).first()
-                    if message:
-                        return message.to_dict()
-                
-                return None
+                audio = db.query(MergedAudio).filter(MergedAudio.message_id == message_id).first()
+
+                formatted_json = json.dumps(audio.to_dict(), indent=4, ensure_ascii=False, sort_keys=True)
+                print(f"message get_audio_by_message_id: {formatted_json}")
+
+                if audio:
+                    return audio.to_dict()
+
         except Exception as e:
             logging.error(f"灵活查询消息失败: {e}")
             logging.error(traceback.format_exc())

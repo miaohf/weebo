@@ -11,6 +11,8 @@ const PromisePlayer = {
     isPlaying: false,
     maxSegmentSeen: -1  // 记录已经接收到的最大分片索引
   },
+  // 添加已播放消息记录
+  playedMessages: new Set(),
 
   // 添加初始化方法
   init() {
@@ -22,11 +24,13 @@ const PromisePlayer = {
       isPlaying: false,
       maxSegmentSeen: -1
     };
+    this.playedMessages = new Set();
+    this.processedAudioIds = new Set();
   },
 
   // 添加分片
   addSegment(messageId, segmentIndex, segmentData) {
-    console.log(`接收到消息 ${messageId} 的分片 ${segmentIndex}`, segmentData);
+    console.log(`接收到消息 ${messageId} 的分片 ${segmentIndex}`);
 
     // 初始化消息分片存储
     if (!this.segmentsByMessage[messageId]) {
@@ -44,17 +48,28 @@ const PromisePlayer = {
       );
     }
 
-    // 如果是新消息的第一个分片，开始播放
+    // 如果是新消息的第一个分片，只有当消息未被播放过时才开始播放
     if (segmentIndex === 0 &&
-      (!this.currentPlayback.isPlaying || this.currentPlayback.messageId !== messageId)) {
+        !this.playedMessages.has(messageId) &&
+        (!this.currentPlayback.isPlaying || this.currentPlayback.messageId !== messageId)) {
       console.log(`收到分片0，开始播放消息 ${messageId}`);
-      this.startPlayback(messageId);
+      // 这里不直接调用startPlayback，而是通过外部控制播放
+      // this.startPlayback(messageId);
+      return true; // 返回标识表示这是首次收到第一个分片
     }
+    
+    return false;
   },
 
   // 开始播放
   startPlayback(messageId) {
     console.log(`准备播放消息 ${messageId} 的音频`);
+    
+    // 检查是否已经播放过这条消息
+    if (this.playedMessages.has(messageId)) {
+      console.log(`消息 ${messageId} 已经播放过，跳过重复播放`);
+      return false;
+    }
     
     // 如果正在播放，先停止
     if (this.currentPlayback.isPlaying) {
@@ -68,6 +83,9 @@ const PromisePlayer = {
       isPlaying: true,
       maxSegmentSeen: -1
     };
+    
+    // 标记此消息已开始播放
+    this.playedMessages.add(messageId);
 
     // 查找当前已接收的最大分片索引
     const segments = this.segmentsByMessage[messageId] || {};
@@ -78,13 +96,13 @@ const PromisePlayer = {
 
     console.log(`开始播放消息 ${messageId}，已接收到的最大分片索引: ${this.currentPlayback.maxSegmentSeen}`);
 
-    // 确保有分片可播放
+    // 确保有分片可播放，并立即开始播放
     if (this.currentPlayback.maxSegmentSeen >= 0) {
       // 启动播放链
       this.playSequence(messageId, 0);
     } else {
       console.log(`消息 ${messageId} 暂无可播放的音频分片，等待数据...`);
-      // 等待分片数据
+      // 等待分片数据 - 减少等待时间以加快响应
       setTimeout(() => {
         if (this.segmentsByMessage[messageId] && Object.keys(this.segmentsByMessage[messageId]).length > 0) {
           this.playSequence(messageId, 0);
@@ -92,8 +110,10 @@ const PromisePlayer = {
           console.log(`等待超时，暂无音频分片`);
           this.currentPlayback.isPlaying = false;
         }
-      }, 1000);
+      }, 500); // 缩短等待时间
     }
+    
+    return true;
   },
 
   // 播放序列
@@ -157,27 +177,35 @@ const PromisePlayer = {
   playSingleSegment(segment) {
     return new Promise((resolve, reject) => {
       try {
+        console.log(`准备播放音频片段，数据长度: ${segment.audio_data.length}`);
+        
         // 创建新的Audio元素
         const audio = new Audio();
-
+        
         // 设置事件监听器
         audio.onended = () => {
-          console.log(`音频播放完成事件触发`);
+          console.log(`音频播放完成`);
           resolve();
         };
-
+        
         audio.onerror = (e) => {
           console.error(`音频播放错误:`, e, audio.error);
           reject(new Error(`播放错误: ${audio.error?.message || '未知错误'}`));
         };
-
+        
+        // 调试 - 添加可以音频加载事件
+        audio.onloadeddata = () => {
+          console.log(`音频数据已加载，准备播放`);
+        };
+        
         // 设置音频源
         const base64Audio = segment.audio_data;
         audio.src = `data:audio/wav;base64,${base64Audio}`;
-
+        console.log(`音频源已设置，尝试播放`);
+        
         // 播放音频
         const playPromise = audio.play();
-
+        
         // 现代浏览器返回播放Promise
         if (playPromise !== undefined) {
           playPromise.catch(error => {
@@ -243,6 +271,9 @@ const useChat = () => {
     checkAndQueueNextSegments: null,
     playNextInQueue: null
   });
+
+  // 在 useChat 函数内添加一个新的 ref
+  const processedAudioIdsRef = useRef(new Set());
 
   // 添加消息函数
   const addMessage = useCallback((role, content, messageId = null) => {
@@ -315,12 +346,12 @@ const useChat = () => {
   const handleAudioData = useCallback(async (messageData) => {
     try {
       const { message_id, segment_index, total_segments, audio_data, sample_rate, english, chinese } = messageData;
-      console.log(`处理音频段落 ${segment_index}/${total_segments}`);
+      console.log(`处理音频段落 ${segment_index}/${total_segments} for ${message_id}`);
       
       // 更新UI状态
       setMessages(prevMessages => {
         return prevMessages.map(msg => {
-          if (msg.id === message_id) {
+          if (msg.id === message_id || msg.message_id === message_id) {
             return {
               ...msg,
               audio_data: audio_data,
@@ -334,18 +365,23 @@ const useChat = () => {
       
       // 添加到Promise播放器
       PromisePlayer.addSegment(message_id, segment_index, {
-          audio_data,
+        audio_data,
         sample_rate,
         total_segments,
         english,
         chinese
       });
 
-      // 根据设置决定是否自动播放
-      if (autoPlayAudio && segment_index === 0) {
-        console.log(`自动播放已启用，触发音频播放`);
+      // 仅在接收第一个分段且message_id不在正在播放的队列中时触发播放
+      if (segment_index === 0 && !PromisePlayer.playedMessages.has(message_id)) {
+        console.log(`收到消息 ${message_id} 的第一个音频段落，触发自动播放`);
+        
+        // 短暂延迟确保UI和音频数据已准备好
         setTimeout(() => {
-          PromisePlayer.startPlayback(message_id);
+          if (!PromisePlayer.playedMessages.has(message_id)) {
+            console.log('开始自动播放');
+            PromisePlayer.startPlayback(message_id);
+          }
         }, 100);
       }
 
@@ -353,7 +389,7 @@ const useChat = () => {
       console.error('处理音频数据失败:', error);
       setError('处理音频数据失败');
     }
-  }, [setMessages, setError, autoPlayAudio]);
+  }, [setMessages, setError]);
 
   // 开始播放一条消息的所有分片
   const startMessagePlayback = useCallback((messageId) => {
@@ -523,6 +559,27 @@ const useChat = () => {
         messageType, 
         speaker,
         (chunk) => {
+          // 使用 ref 而不是 this
+          const processedAudioIds = processedAudioIdsRef.current;
+          
+          // 检查是否是音频数据
+          if ((chunk.type === 'audio' || chunk.audio_data) && chunk.message_id && chunk.segment_index !== undefined) {
+            const audioId = `${chunk.message_id}-${chunk.segment_index}`;
+            
+            // 检查是否已处理过此音频分片
+            if (processedAudioIds.has(audioId)) {
+              console.log("跳过已处理的音频分片:", audioId);
+              return;
+            }
+            
+            // 标记为已处理
+            processedAudioIds.add(audioId);
+            
+            console.log("处理音频数据:", chunk.message_id, chunk.segment_index);
+            handleAudioData(chunk);
+            return; // 处理完音频数据后直接返回
+          }
+          
           // 合并chunk到当前消息
           currentMessage = {
             ...currentMessage,
@@ -559,7 +616,7 @@ const useChat = () => {
         )
       );
     }
-  }, []);
+  }, [handleAudioData]);
 
   // 清除历史记录
   const clearHistory = useCallback(async () => {
@@ -663,15 +720,8 @@ const useChat = () => {
                 if (!data.message_id && assistantMessageId) {
                   data.message_id = assistantMessageId;
                 }
-                await handleAudioData(data);
-                
-                // 添加这部分 - 确保第一个音频段落触发自动播放
-                if (data.segment_index === 0) {
-                  console.log(`流处理中收到第一个音频段落，触发自动播放`);
-                  setTimeout(() => {
-                    PromisePlayer.startPlayback(data.message_id);
-                  }, 100);
-                }
+                console.log('收到音频数据:', data.segment_index, '/', data.total_segments);
+                handleAudioData(data);
                 break;
                 
               case 'audio_complete':
@@ -764,28 +814,27 @@ const useChat = () => {
   }, [showChinese]); // 添加依赖
 
   useEffect(() => {
-    // 尝试解锁音频
+    // 尝试解锁音频自动播放
     const unlockAudio = () => {
-      // 创建并立即播放一个静音的、极短的音频
-      const silentAudio = new Audio("data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjI5LjEwMAAAAAAAAAAAAAAA//tUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAADmADMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM//MUZAAAAAGkAAAAAAAAA0gAAAAATEFN//MUZAMAAAGkAAAAAAAAA0gAAAAARTMu//MUZAYAAAGkAAAAAAAAA0gAAAAAOTku//MUZAkAAAGkAAAAAAAAA0gAAAAANVVV");
-      silentAudio.volume = 0.01;
-      silentAudio.play().then(() => {
-        console.log("音频已解锁");
-      }).catch(e => {
-        console.log("无法解锁音频:", e);
+      const silentSound = new Audio("data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjI5LjEwMAAAAAAAAAAAAAAA//tUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAADmADMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM//MUZAAAAAGkAAAAAAAAA0gAAAAATEFN//MUZAMAAAGkAAAAAAAAA0gAAAAARTMu//MUZAYAAAGkAAAAAAAAA0gAAAAAOTku//MUZAkAAAGkAAAAAAAAA0gAAAAANVVV");
+      silentSound.volume = 0.01;
+      silentSound.play().then(() => {
+        console.log("音频自动播放已解锁");
+      }).catch(err => {
+        console.warn("无法解锁音频自动播放:", err);
       });
       
-      // 移除事件监听器
+      // 成功后移除事件监听
       document.removeEventListener('click', unlockAudio);
       document.removeEventListener('touchstart', unlockAudio);
     };
     
-    // 添加解锁事件监听器
+    // 添加事件监听器等待用户交互
     document.addEventListener('click', unlockAudio);
     document.addEventListener('touchstart', unlockAudio);
     
+    // 清理函数
     return () => {
-      // 清理
       document.removeEventListener('click', unlockAudio);
       document.removeEventListener('touchstart', unlockAudio);
     };

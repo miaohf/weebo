@@ -10,7 +10,9 @@ import json
 import sqlite3
 import logging
 from datetime import datetime
-from models.database_models import init_db, Message, AudioSegment, MergedAudio
+from models.base import init_db
+from models.message import Message
+from models.audio import AudioSegment, MergedAudio
 from sqlalchemy import create_engine
 from models.message import Base as MessageBase
 from models.audio import Base as AudioBase

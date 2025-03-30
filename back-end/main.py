@@ -98,18 +98,20 @@ async def unified_chat(
 async def get_audio(message_id: str = Form(...)):
     """获取指定消息ID的历史音频数据"""
     try:
-        # 处理可能的前缀
-        if message_id.startswith("assistant-"):
-            message_id = message_id.split("assistant-", 1)[1]
+        # # 处理可能的前缀
+        # if message_id.startswith("assistant-"):
+        #     message_id = message_id.split("assistant-", 1)[1]
         
+        print(f"message_id: {message_id}")
         # 获取消息
-        message = assistant.db_service.get_message_by_flexible_id(message_id)
-        
-        if not message:
+        audio = assistant.db_service.get_audio_by_message_id(message_id)
+
+        if not audio:
             raise HTTPException(status_code=404, detail="未找到消息")
         
         # 获取音频数据
-        audio_response = await assistant.get_message_audio(message_id, message)
+        audio_response = await assistant.get_message_audio(message_id, audio)
+
         if audio_response:
             return JSONResponse(audio_response)
         else:
@@ -149,20 +151,20 @@ def main():
         def signal_handler(sig, frame):
             logger.info("Shutting down...")
             assistant.shutdown_event.set()
-        
+            
         signal.signal(signal.SIGINT, signal_handler)
         signal.signal(signal.SIGTERM, signal_handler)
         
         uvicorn_config = uvicorn.Config(
-            app,
-            host="0.0.0.0",
+        app,
+        host="0.0.0.0",
             port=config.PORT if hasattr(config, 'PORT') else 8080,
-            log_level="info",
+        log_level="info",
             access_log=True
-        )
-        
+    )
+    
         server = uvicorn.Server(uvicorn_config)
-        server.run()
+    server.run()
 
 if __name__ == "__main__":
     main()

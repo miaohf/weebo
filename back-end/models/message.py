@@ -23,7 +23,7 @@ class Message(Base):
     image_path = Column(Text, nullable=True)  # 可存储多个路径，用逗号分隔
     
     # 时间戳
-    timestamp = Column(DateTime, default=datetime.datetime.now)
+    created_at = Column(DateTime, default=datetime.datetime.now)
     
     def __repr__(self):
         return f"<Message(message_id='{self.message_id}', type='{self.role}')>"
@@ -34,7 +34,7 @@ class Message(Base):
             "id": self.id,
             "message_id": self.message_id,
             "role": self.role,
-            "timestamp": self.timestamp.isoformat() if self.timestamp else None
+            "created_at": self.created_at.isoformat() if self.created_at else None
         }
         
         # 处理内容字段
@@ -55,11 +55,11 @@ class Message(Base):
             
         # 添加音频路径（如果存在）
         if self.audio_path:
-            result["audio"] = {"path": self.audio_path}
+            result["audio_path"] = self.audio_path
             
         # 添加图像路径（如果存在）
         if self.image_path:
             paths = self.image_path.split(",")
-            result["images"] = [{"path": path.strip()} for path in paths if path.strip()]
+            result["images"] = [{"image_path": path.strip()} for path in paths if path.strip()]
             
         return result 

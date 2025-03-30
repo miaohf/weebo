@@ -22,37 +22,17 @@ def user_message(message):
     """Format user message with cyan color."""
     print(f"\n{CYAN}You: {message}{RESET_COLOR}")
 
-# def assistant_message(message):
-#     """Format assistant message with pink color."""
-#     # Split message into English and Chinese parts
-#     parts = message.split('\n\n', 1)
-    
-#     if len(parts) == 2:
-#         # Bilingual message
-#         english_part, chinese_part = parts
-        
-#         # Print English part with Assistant prefix
-#         print(f"\n{NEON_GREEN}Assistant: {PINK}{english_part}{RESET_COLOR}")
-        
-#         # Print Chinese part without Assistant prefix, but with proper indentation
-#         # Add spaces to align with the "Assistant: " prefix (11 characters)
-#         indent = " " * 11
-#         print(f"{PINK}{indent}{chinese_part}{RESET_COLOR}")
-#     else:
-#         # Single language message
-#         print(f"\n{NEON_GREEN}Assistant: {PINK}{message}{RESET_COLOR}")
-
 def assistant_message(message):
-    """Format assistant message with pink color."""
-    
-    # Print English part with Assistant prefix
-    print(f"\n{NEON_GREEN}Assistant: {PINK}{message["english"]}{RESET_COLOR}")
-    
-    # Print Chinese part without Assistant prefix, but with proper indentation
-    # Add spaces to align with the "Assistant: " prefix (11 characters)
-    indent = " " * 11
-    print(f"{PINK}{indent}{message["chinese"]}{RESET_COLOR}")
-
+    """打印助手消息"""
+    # 如果 message 是字典
+    if isinstance(message, dict):
+        if "english" in message and isinstance(message["english"], str):
+            print(f"\n{NEON_GREEN}Assistant: {PINK}{message['english']}{RESET_COLOR}")
+        else:
+            print(f"\n{NEON_GREEN}Assistant: {PINK}{str(message)}{RESET_COLOR}")
+    # 如果 message 是字符串
+    else:
+        print(f"\n{NEON_GREEN}Assistant: {PINK}{message}{RESET_COLOR}")
 
 def error(message, exception=None):
     """Log error message."""

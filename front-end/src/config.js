@@ -4,7 +4,8 @@ export const API_URL = process.env.REACT_APP_API_URL || 'http://192.168.31.17:80
 // 音频配置
 export const AUDIO_CONFIG = {
   defaultSampleRate: 24000,
-  defaultSpeaker: 'default'
+  defaultSpeaker: 'default',
+  autoPlay: true
 };
 
 // 聊天配置

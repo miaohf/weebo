@@ -122,15 +122,24 @@ export const sendChatMessageStreaming = async (message, files = [], messageType 
       const text = decoder.decode(value, { stream: true });
       buffer += text;
       
+      console.log("收到流数据块，长度:", text.length);
+      
       // 处理完整的行
       const lines = buffer.split('\n');
-      buffer = lines.pop() || ''; // 保留最后一个不完整的行
+      buffer = lines.pop() || '';
       
       // 处理每一行
       for (const line of lines) {
         if (line.trim()) {
           try {
             const data = JSON.parse(line);
+            console.log("解析的JSON数据类型:", data.type || "未指定类型", data);
+            
+            // 特别检查是否有音频数据
+            if (data.type === 'audio' || data.audio_data || data.segment_index !== undefined) {
+              console.log("检测到音频数据:", data.message_id, "分段:", data.segment_index || 0);
+            }
+            
             if (onChunk) onChunk(data);
           } catch (e) {
             console.warn('无法解析JSON行:', e, line);

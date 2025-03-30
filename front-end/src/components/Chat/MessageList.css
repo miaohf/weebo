@@ -98,4 +98,18 @@
 /* 让消息列表在切换语言时有平滑过渡 */
 .message-list .message {
   transition: all 0.3s ease;
+}
+
+.message-list-container {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 1rem;
+  gap: 8px;
+  height: calc(100vh - 140px);
+}
+
+/* Optional: Add smooth scrolling for the container */
+.message-list-container {
+  scroll-behavior: smooth;
 } 

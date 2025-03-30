@@ -1,10 +1,5 @@
 import React, { useState, useRef } from 'react';
 import { FaMicrophone, FaKeyboard, FaImage } from 'react-icons/fa';
-import { MdSend } from 'react-icons/md';
-import { IoArrowUp, IoSend } from 'react-icons/io5';
-import { BsSendFill } from 'react-icons/bs';
-import { AiOutlineSend } from "react-icons/ai";
-import { IoIosPaperPlane } from "react-icons/io";
 import { BsArrowRightCircleFill } from "react-icons/bs";
 import './ChatInput.css';
 

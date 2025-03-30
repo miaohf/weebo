@@ -45,31 +45,35 @@ class TextMessageProcessor(BaseMessageProcessor):
         
         # 获取LLM响应
         response_data = self.assistant.llm_service.get_response(message)
+        # debug(f"LLM response: {response_data}")
         
-        if not response_data:
-            return JSONResponse(
-                status_code=500,
-                content={"error": "无法从LLM获取响应", "status": "error"}
-            )
+        # 确保我们有正确的字符串格式，而不是嵌套的 JSON
+        english_text = response_data.get("english", "")
+        chinese_text = response_data.get("chinese", "")
+
+        # 保存助手回复, 只保存英文消息
+        assistant_message_id = self.assistant.db_service.save_message("assistant", english_text)
         
-        # 创建响应消息
-        display_message = {
-            "english": response_data["english"],
-            "chinese": response_data["chinese"]
+        # 如果内容仍然是字典，尝试提取字符串
+        if isinstance(english_text, dict):
+            english_text = english_text.get("english", str(english_text))
+        if isinstance(chinese_text, dict):
+            chinese_text = chinese_text.get("chinese", str(chinese_text))
+        
+        display_text = {
+            "english": english_text,
+            "chinese": chinese_text
         }
         
-        # 记录助手消息
-        assistant_message(display_message)
-        
-        # 保存助手回复
-        assistant_message_id = self.assistant.db_service.save_message("assistant", display_message)
+        # 日志打印和消息传递使用简单结构
+        assistant_message(display_text)
         
         # 如果不需要音频，直接返回文本响应
         if not stream_audio:
             return JSONResponse({
                 "message_id": assistant_message_id,
-                "message_type": "text",
-                "content": display_message,
+                "type": "text",
+                "content": display_text,
                 "status": "success"
             })
         
@@ -83,7 +87,7 @@ class TextMessageProcessor(BaseMessageProcessor):
             text_response = {
                 "type": "text",
                 "message_id": assistant_message_id,
-                "content": display_message
+                "content": display_text
             }
             yield json.dumps(text_response) + "\n"
             

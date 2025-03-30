@@ -15,6 +15,7 @@ from models.stt_model import SpeechToTextModel
 from models.tts_model import TextToSpeechModel
 from utils.logging_utils import debug, info, error
 import config
+import json
 
 class Assistant:
     """Main assistant class that coordinates all services."""
@@ -33,6 +34,9 @@ class Assistant:
         
         # Load conversation history
         messages = self.db_service.load_session()
+        # formatted_json = json.dumps(messages, indent=4, ensure_ascii=False, sort_keys=True)
+        # print(f"formatted_json: {formatted_json}")
+
         if messages:
             self.llm_service.set_messages(messages)
     
@@ -70,83 +74,35 @@ class Assistant:
             error(f"图像分析失败: {e}")
             return "无法分析图像内容"
     
-    async def get_message_audio(self, message_id: str, message: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    async def get_message_audio(self, message_id: str, audio: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """获取消息的音频数据"""
+        print(f"audio: {audio}")    
         try:
             # 检查是否有合并后的音频
-            if "merged_audio" in message and message["merged_audio"]:
-                merged_info = message["merged_audio"]
-                merged_path = os.path.join(config.AUDIO_STORAGE_DIR, merged_info["merged_path"])
+            if "path" in audio and audio["path"]:
+                audio_path = audio["path"]
                 
-                if os.path.exists(merged_path):
+                if os.path.exists(audio_path):
                     # 读取音频文件
-                    with open(merged_path, "rb") as f:
+                    with open(audio_path, "rb") as f:
                         audio_binary = f.read()
                     
                     # 转换为Base64
-                    audio_base64 = base64.b64encode(audio_binary).decode('utf-8')
+                    base64_audio_data = base64.b64encode(audio_binary).decode('utf-8')
                     
                     # 返回音频数据
                     return {
                         "type": "audio",
                         "message_id": message_id,
-                        "audio_data": audio_base64,
-                        "sample_rate": merged_info.get("sample_rate", 24000),
-                        "format": "base64",
-                        "is_merged": True
+                        "audio_data": base64_audio_data,
+                        "sample_rate": audio.get("sample_rate", 24000),
+                        "encoding": "base64",  # 表示数据编码方式
+                        "format": "wav",       # 表示音频格式
+                        "is_merged": True,
+                        "segment_index": 0,
+                        "total_segments": 1,
                     }
-            
-            # 检查音频段落
-            audio_paths = message.get("audio_paths", [])
-            if not audio_paths:
-                return None
-            
-            # 实时合并音频段落
-            sorted_paths = sorted(audio_paths, key=lambda x: x["segment_index"])
-            combined = None
-            sample_rate = None
-            
-            for segment_info in sorted_paths:
-                segment_path = os.path.join(config.AUDIO_STORAGE_DIR, segment_info["path"])
-                if os.path.exists(segment_path):
-                    segment_audio = AudioSegment.from_file(segment_path)
-                    
-                    if combined is None:
-                        combined = segment_audio
-                        sample_rate = segment_info.get("sample_rate", 24000)
-                    else:
-                        combined += segment_audio
-            
-            if combined is None:
-                return None
-            
-            # 创建临时文件
-            temp_path = os.path.join(config.AUDIO_STORAGE_DIR, f"temp_{message_id}.wav")
-            combined.export(temp_path, format="wav")
-            
-            # 读取合并后的文件
-            with open(temp_path, "rb") as f:
-                audio_binary = f.read()
-            
-            # 删除临时文件
-            try:
-                os.remove(temp_path)
-            except:
-                pass
-            
-            # 转换为Base64
-            audio_base64 = base64.b64encode(audio_binary).decode('utf-8')
-            
-            # 返回音频数据
-            return {
-                "type": "audio",
-                "message_id": message_id,
-                "audio_data": audio_base64,
-                "sample_rate": sample_rate or 24000,
-                "format": "base64",
-                "is_merged": True
-            }
-            
+                           
         except Exception as e:
             error(f"获取音频数据失败: {e}")
             return None
