@@ -32,6 +32,17 @@ body {
   justify-content: space-between;
   align-items: center;
   background-color: var(--bg-color);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  transition: transform 0.3s ease;
+}
+
+/* 添加新的 class 用于处理隐藏/显示 header 的样式 */
+.App-header.hidden {
+  transform: translateY(-100%);
 }
 
 .logo {
@@ -55,7 +66,10 @@ body {
 
 main {
   flex: 1;
-  padding: 1rem;
+  padding-top: calc(1rem + 60px); /* 调整此值以匹配 header 高度 */
+  padding-left: 1rem;
+  padding-right: 1rem;
+  padding-bottom: 1rem;
   background-color: var(--chat-bg);
   display: flex;
   flex-direction: column;

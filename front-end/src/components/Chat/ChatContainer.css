@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background-color: var(--bg-secondary);
+  background-color: var(--bg-color);
   overflow: hidden;
   position: relative;
   flex: 1;
@@ -11,8 +11,8 @@
 .message-list-container {
   flex: 1;
   overflow-y: auto;
-  padding: 20px;
-  background-color: var(--bg-secondary);
+  padding: 2px;
+  background-color: var(--bg-color);
   height: calc(100% - 60px); /* 减去底部控件的高度 */
   /* padding-bottom: 80px;  */
 }
@@ -32,7 +32,7 @@
   left: 0;
   right: 0;
   width: 100%;
-  background-color: var(--bg-secondary);
+  background-color: var(--bg-color);
   z-index: 10;
   max-width: var(--chat-max-width);
   margin: 0 auto;
@@ -104,7 +104,7 @@
   }
 
   .message-list-container {
-    padding: 15px;
+    padding: 5px;
     padding-bottom: 70px;
   }
   
