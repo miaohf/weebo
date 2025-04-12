@@ -37,7 +37,7 @@
   --border-radius-md: 8px;
   --border-radius-lg: 12px;
   --border-radius-xl: 20px;
-  --border-color: var(--gray-200);
+  --border-color: transparent;
   
   /* 阴影 */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
@@ -62,18 +62,14 @@
   --sidebar-width: 280px;
   
   /* 亮色主题 */
-  --bg-primary: #ffffff;
-  --bg-secondary: #f7f7f7;
-  --bg-tertiary: #f0f0f0;
-  --text-primary: #333333;
-  --text-secondary: #666666;
-  --user-bubble: linear-gradient(135deg, #4a90e2, #357abd);
-  --assistant-bubble: linear-gradient(135deg, #f0f0f0, #e0e0e0);
-  --user-text: #ffffff;
-  --assistant-text: #333333;
+  --bg-color: #ffffff;
+  --text-color: #333333;
+  --chat-bg: #f7f7f7;
   --input-bg: #ffffff;
   --input-border: #e2e8f0;
   --input-text: #333333;
+  --user-bubble: linear-gradient(135deg, #c7b5aa, #c7b5aa);
+  --assistant-bubble: linear-gradient(135deg, #cbd1cc, #cbd1cc);
   --button-bg: #f0f0f0;
   --button-hover: #e0e0e0;
   --button-text: #333333;
@@ -93,19 +89,15 @@
 }
 
 [data-theme="dark"] {
-  --bg-primary: #1a1a1a;
-  --bg-secondary: #1f1f1f;
-  --bg-tertiary: #2d2d2d;
-  --text-primary: #e2e8f0;
-  --text-secondary: #a0aec0;
+  --bg-color: #1f1f1f;
+  --text-color: #d7d9db;
   --border-color: #2d3748;
-  --user-bubble: linear-gradient(135deg, #2b6cb0, #2c5282);
-  --assistant-bubble: linear-gradient(135deg, #2d2d2d, #1a1a1a);
-  --user-text: #ffffff;
-  --assistant-text: #e2e8f0;
+  --chat-bg: #1f1f1f;
   --input-bg: #2d2d2d;
   --input-border: #3d3d3d;
   --input-text: #e2e8f0;
+  --user-bubble: linear-gradient(135deg, #473b20, #473b20);
+  --assistant-bubble: linear-gradient(135deg, #2b3a3b, #2b3a3b);
   --button-bg: #2d2d2d;
   --button-hover: #3d3d3d;
   --button-text: #e2e8f0;

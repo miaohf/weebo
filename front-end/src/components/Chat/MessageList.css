@@ -75,7 +75,7 @@
   right: 0;
   top: 50%;
   height: 1px;
-  background-color: var(--border-color);
+  background-color: transparent;
   z-index: 1;
 }
 
