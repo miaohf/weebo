@@ -78,7 +78,8 @@
 /* 模式切换和图片上传按钮样式 */
 .mode-toggle-button,
 .image-upload-button {
-  color: var(--text-secondary);
+  background: var(--bg-color);
+  color: var(--text-color);
 }
 
 .mode-toggle-button:hover,
@@ -88,12 +89,10 @@
 
 /* 发送按钮样式 - 只修改颜色，保持大小一致 */
 .send-button {
-  background: var(--user-bubble);
-  color: var(--user-text);
+  background: var(--bg-color);
+  color: var(--text-color);
   border: none;
   border-radius: 50%;
-  width: 40px;
-  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;

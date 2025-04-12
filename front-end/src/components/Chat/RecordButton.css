@@ -11,9 +11,8 @@
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background-color: var(--bg-main);
-  border: 1px solid var(--border-color);
-  color: var(--text-secondary);
+  background: var(--bg-color);
+  color: var(--text-color);
   cursor: pointer;
   transition: all var(--transition-fast);
 }

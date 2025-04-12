@@ -84,30 +84,6 @@
   border-color: var(--primary-dark);
 }
 
-.language-toggle {
-  background-color: #f0f0f0;
-  border: none;
-  border-radius: 4px;
-  padding: 3px 8px;
-  margin-right: 10px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: all 0.2s ease;
-}
-
-.language-toggle.active {
-  background-color: #7c9ae7;
-  color: white;
-}
-
-.language-toggle:hover {
-  background-color: #e0e0e0;
-}
-
-/* .language-toggle.active:hover {
-  background-color: #3a6cee;
-} */
-
 /* 图标样式 */
 .button-icon {
   display: inline-block;

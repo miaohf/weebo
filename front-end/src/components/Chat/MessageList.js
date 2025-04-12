@@ -8,12 +8,75 @@ const MessageList = ({ onAudioData, ...props }) => {
   const [currentPlayingAudio, setCurrentPlayingAudio] = useState(null);
   const [, setIsPlaying] = useState(false);
   const [currentPlayingMessageId, setCurrentPlayingMessageId] = useState(null);
+  const lastMessageIdRef = useRef(null);
+  const receivedAudioRef = useRef(false);
+  const [showScrollButton, setShowScrollButton] = useState(false);
+
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    setShowScrollButton(false);
+  }, []);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const handleScroll = () => {
+      const container = document.querySelector('.message-list-container');
+      if (!container) return;
+      
+      const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+      
+      if (isAtBottom) {
+        setShowScrollButton(false);
+      }
+    };
+    
+    const container = document.querySelector('.message-list-container');
+    if (container) {
+      container.addEventListener('scroll', handleScroll);
+    }
+    
+    return () => {
+      if (container) {
+        container.removeEventListener('scroll', handleScroll);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!props.messages || props.messages.length === 0) return;
+    
+    const lastMessage = props.messages[props.messages.length - 1];
+    const lastMessageId = lastMessage.id || lastMessage.message_id;
+    
+    const isNewMessage = lastMessageId !== lastMessageIdRef.current;
+    
+    lastMessageIdRef.current = lastMessageId;
+    
+    const isAudioMessage = 
+      lastMessage.message_type === 'audio' || 
+      lastMessage.is_audio_segment === true ||
+      lastMessage.audio_data || 
+      lastMessage.segment_index !== undefined;
+    
+    if (isAudioMessage) {
+      console.log('收到音频消息，不滚动到底部:', lastMessageId);
+      receivedAudioRef.current = true;
+      
+      if (isNewMessage) {
+        setShowScrollButton(true);
+      }
+      
+      return;
+    }
+    
+    if (isNewMessage && !receivedAudioRef.current) {
+      console.log('滚动到底部 - 新文本消息:', lastMessageId);
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      setShowScrollButton(false);
+    }
+    
+    receivedAudioRef.current = false;
   }, [props.messages]);
 
-  // 清理函数，用于停止当前播放的音频
   const cleanupAudio = useCallback(() => {
     if (currentPlayingAudio) {
       currentPlayingAudio.pause();
@@ -27,7 +90,6 @@ const MessageList = ({ onAudioData, ...props }) => {
     setCurrentPlayingMessageId(null);
   }, [currentPlayingAudio]);
 
-  // 组件卸载时清理音频
   useEffect(() => {
     return () => {
       cleanupAudio();
@@ -35,13 +97,11 @@ const MessageList = ({ onAudioData, ...props }) => {
   }, [cleanupAudio]);
 
   const handleReplayAudio = useCallback(async (message) => {
-    // 如果正在播放的是同一条消息，则停止播放
     if (currentPlayingMessageId === message.message_id) {
       cleanupAudio();
       return;
     }
 
-    // 如果正在播放其他消息，先停止它
     if (currentPlayingAudio) {
       cleanupAudio();
     }
@@ -52,7 +112,6 @@ const MessageList = ({ onAudioData, ...props }) => {
         const audio = new Audio();
         audio.src = `data:audio/${messageAudio.format};base64,${messageAudio.audio_data}`;
         
-        // 设置音频事件监听
         audio.onplay = () => {
           setIsPlaying(true);
           setCurrentPlayingAudio(audio);
@@ -68,7 +127,6 @@ const MessageList = ({ onAudioData, ...props }) => {
           cleanupAudio();
         };
         
-        // 播放音频
         await audio.play();
       } else {
         console.warn('没有可用的音频数据');
@@ -104,6 +162,16 @@ const MessageList = ({ onAudioData, ...props }) => {
         })
       )}
       <div ref={messagesEndRef} />
+      
+      {showScrollButton && (
+        <button 
+          className="scroll-to-bottom-btn"
+          onClick={scrollToBottom}
+          title="滚动到底部"
+        >
+          ↓
+        </button>
+      )}
     </div>
   );
 };

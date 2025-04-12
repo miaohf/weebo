@@ -422,7 +422,9 @@ const useChat = () => {
               ...msg,
               audio_data: audio_data,
               segment_index,
-              total_segments
+              total_segments,
+              message_type: 'audio', // 添加类型标记以识别这是音频消息
+              is_audio_segment: true // 添加额外标记以便于检测
             };
           }
           return msg;

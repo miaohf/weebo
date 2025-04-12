@@ -112,4 +112,33 @@
 /* Optional: Add smooth scrolling for the container */
 .message-list-container {
   scroll-behavior: smooth;
+}
+
+.scroll-to-bottom-btn {
+  position: fixed;
+  bottom: 80px;
+  right: 20px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: rgba(0, 0, 0, 0.6);
+  color: white;
+  font-size: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  z-index: 100;
+  transition: all 0.3s ease;
+}
+
+.scroll-to-bottom-btn:hover {
+  background-color: rgba(0, 0, 0, 0.8);
+  transform: scale(1.1);
+}
+
+.scroll-to-bottom-btn:active {
+  transform: scale(0.95);
 } 

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './Controls.css';
-import { FiSettings } from 'react-icons/fi';
+import { FiMoreVertical } from 'react-icons/fi';
 import { AVAILABLE_SPEAKERS } from '../../config'; // 导入配置
 
 const SettingsMenu = ({ 
@@ -74,7 +74,7 @@ const SettingsMenu = ({
         onClick={() => setIsOpen(!isOpen)}
         title="设置"
       >
-        <FiSettings color="#888" size={20} />
+        <FiMoreVertical color="#888" size={20} />
       </button>
       
       {/* 下拉菜单 */}

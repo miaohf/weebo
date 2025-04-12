@@ -4,7 +4,12 @@ import ChatBubble from '../ChatBubble';
 import './Message.css';
 
 const Message = ({ message, showChinese, onPlayAudio, onReplayAudio, isPlaying }) => {
-  const { message_id, content, role, status } = message;
+  const { message_id, content, role, status, segment_index, total_segments } = message;
+  const isAssistant = role === 'assistant';
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // 检查是否收到所有音频分片
+  const isAudioComplete = !total_segments || (segment_index !== undefined && total_segments && segment_index === total_segments - 1);
   
   // 添加调试日志
   console.log("Message 渲染:", { 
@@ -12,32 +17,11 @@ const Message = ({ message, showChinese, onPlayAudio, onReplayAudio, isPlaying }
     role, 
     showChinese, 
     contentType: typeof content,
-    hasChineseContent: content && typeof content === 'object' && 'chinese' in content
+    hasChineseContent: content && typeof content === 'object' && 'chinese' in content,
+    segment_index,
+    total_segments,
+    isAudioComplete
   });
-  
-  let displayContent = null;
-  
-  if (content) {
-    if (typeof content === 'object') {
-      if (showChinese && role === 'assistant') {
-        displayContent = (
-          <>
-            <p className="message-english">{content.english || ''}</p>
-            {content.chinese && content.chinese !== content.english && (
-              <p className="message-chinese">{content.chinese}</p>
-            )}
-          </>
-        );
-      } else {
-        displayContent = <p>{content.english || ''}</p>;
-      }
-    } else {
-      displayContent = <p>{content}</p>;
-    }
-  }
-  
-  const isAssistant = role === 'assistant';
-  const [isLoading, setIsLoading] = useState(false);
   
   const handleReplay = async () => {
     if (isPlaying) return; // 如果正在播放，不允许重复点击
@@ -68,15 +52,17 @@ const Message = ({ message, showChinese, onPlayAudio, onReplayAudio, isPlaying }
       setIsLoading(false);
     }
   };
-
-  return (
-    <div className={`message-container ${role || 'unknown'}`}>
-      <div className="message-content">
-        <ChatBubble 
-          message={
-            <>
-              {displayContent}
-              {isAssistant && (
+  
+  let displayContent = null;
+  
+  if (content) {
+    if (typeof content === 'object') {
+      if (showChinese && role === 'assistant') {
+        displayContent = (
+          <>
+            <p className="message-english">
+              {content.english || ''}
+              {isAssistant && status !== 'loading' && isAudioComplete && (
                 <button 
                   className={`replay-audio-btn ${isLoading ? 'loading' : ''} ${isPlaying ? 'playing' : ''}`}
                   onClick={handleReplay}
@@ -86,18 +72,52 @@ const Message = ({ message, showChinese, onPlayAudio, onReplayAudio, isPlaying }
                   {isLoading ? <span className="loading-spinner" /> : <FaVolumeUp />}
                 </button>
               )}
+            </p>
+            {content.chinese && content.chinese !== content.english && (
+              <p className="message-chinese">{content.chinese}</p>
+            )}
+          </>
+        );
+      } else {
+        displayContent = (
+          <p>
+            {content.english || ''}
+            {isAssistant && status !== 'loading' && isAudioComplete && (
+              <button 
+                className={`replay-audio-btn ${isLoading ? 'loading' : ''} ${isPlaying ? 'playing' : ''}`}
+                onClick={handleReplay}
+                disabled={isLoading || isPlaying}
+                title={isLoading ? "获取语音中..." : isPlaying ? "正在播放..." : "重新播放语音"}
+              >
+                {isLoading ? <span className="loading-spinner" /> : <FaVolumeUp />}
+              </button>
+            )}
+          </p>
+        );
+      }
+    } else {
+      displayContent = <p>{content}</p>;
+    }
+  }
+  
+  return (
+    <div className={`message-container ${role || 'unknown'}`}>
+      <div className="message-content">
+        <ChatBubble 
+          message={
+            <>
+              {displayContent}
+              {status === 'loading' && (
+                <div className="loading-indicator">
+                  <span className="dot"></span>
+                  <span className="dot"></span>
+                  <span className="dot"></span>
+                </div>
+              )}
             </>
           } 
           isUser={!isAssistant}
         />
-        
-        {status === 'loading' && (
-          <div className="loading-indicator">
-            <span className="dot"></span>
-            <span className="dot"></span>
-            <span className="dot"></span>
-          </div>
-        )}
         
         {/* 如果有图像，显示图像 */}
         {message.images && message.images.length > 0 && (

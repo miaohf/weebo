@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { FaMicrophone, FaKeyboard, FaImage } from 'react-icons/fa';
-import { BsArrowRightCircleFill } from "react-icons/bs";
+import { BsArrowRightCircleFill, BsFillRecordCircleFill, BsFillRSquareFill } from "react-icons/bs";
 import './ChatInput.css';
 
 const ChatInput = ({ onSendMessage, isLoading, selectedSpeaker }) => {
@@ -157,7 +157,7 @@ const ChatInput = ({ onSendMessage, isLoading, selectedSpeaker }) => {
               onMouseLeave={isRecording ? stopRecording : undefined}
               disabled={isLoading}
             >
-              {isRecording ? 'Recording...' : 'Long press to record'}
+              {isRecording ?  <BsFillRSquareFill /> : <BsFillRecordCircleFill />}
             </button>
           ) : (
             <>
