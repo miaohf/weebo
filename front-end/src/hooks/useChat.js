@@ -185,7 +185,10 @@ const PromisePlayer = {
         // 设置事件监听器
         audio.onended = () => {
           console.log(`音频播放完成`);
-          resolve();
+          // 延迟解析Promise，确保浏览器完全处理了播放结束事件
+          setTimeout(() => {
+            resolve();
+          }, 50);
         };
         
         audio.onerror = (e) => {
@@ -203,6 +206,9 @@ const PromisePlayer = {
         audio.src = `data:audio/wav;base64,${base64Audio}`;
         console.log(`音频源已设置，尝试播放`);
         
+        // 添加到文档中以防止被GC回收
+        document.body.appendChild(audio);
+        
         // 播放音频
         const playPromise = audio.play();
         
@@ -210,9 +216,21 @@ const PromisePlayer = {
         if (playPromise !== undefined) {
           playPromise.catch(error => {
             console.error(`播放启动失败:`, error);
+            // 播放失败时移除元素
+            document.body.removeChild(audio);
             reject(error);
           });
         }
+        
+        // 当播放完成后移除元素
+        audio.addEventListener('ended', () => {
+          // 延迟移除元素以确保事件处理完毕
+          setTimeout(() => {
+            if (document.body.contains(audio)) {
+              document.body.removeChild(audio);
+            }
+          }, 100);
+        });
       } catch (error) {
         console.error(`设置音频播放失败:`, error);
         reject(error);
@@ -816,17 +834,36 @@ const useChat = () => {
   useEffect(() => {
     // 尝试解锁音频自动播放
     const unlockAudio = () => {
-      const silentSound = new Audio("data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjI5LjEwMAAAAAAAAAAAAAAA//tUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAADmADMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM//MUZAAAAAGkAAAAAAAAA0gAAAAATEFN//MUZAMAAAGkAAAAAAAAA0gAAAAARTMu//MUZAYAAAGkAAAAAAAAA0gAAAAAOTku//MUZAkAAAGkAAAAAAAAA0gAAAAANVVV");
-      silentSound.volume = 0.01;
-      silentSound.play().then(() => {
-        console.log("音频自动播放已解锁");
-      }).catch(err => {
+      try {
+        // 创建一个更可靠的空白音频
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        // 设置音量非常低
+        gainNode.gain.value = 0.001;
+        
+        // 连接节点
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        // 播放非常短的时间
+        oscillator.start();
+        setTimeout(() => {
+          oscillator.stop();
+          audioContext.close();
+          console.log("音频自动播放已解锁");
+        }, 100);
+        
+        // 成功后移除事件监听
+        document.removeEventListener('click', unlockAudio);
+        document.removeEventListener('touchstart', unlockAudio);
+      } catch (err) {
         console.warn("无法解锁音频自动播放:", err);
-      });
-      
-      // 成功后移除事件监听
-      document.removeEventListener('click', unlockAudio);
-      document.removeEventListener('touchstart', unlockAudio);
+        // 即使失败也移除事件监听，避免重复尝试
+        document.removeEventListener('click', unlockAudio);
+        document.removeEventListener('touchstart', unlockAudio);
+      }
     };
     
     // 添加事件监听器等待用户交互

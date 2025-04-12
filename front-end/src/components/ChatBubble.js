@@ -15,7 +15,7 @@ const ChatBubble = ({ message, isUser }) => {
 };
 
 ChatBubble.propTypes = {
-  message: PropTypes.string.isRequired,
+  message: PropTypes.node.isRequired,
   isUser: PropTypes.bool.isRequired
 };
 
