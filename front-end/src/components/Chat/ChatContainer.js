@@ -18,7 +18,8 @@ const ChatContainer = ({
     hasMessages: Array.isArray(messages), 
     messageCount: Array.isArray(messages) ? messages.length : 0,
     onSendMessageType: typeof onSendMessage,
-    isLoading
+    isLoading,
+    showChinese
   });
   
   // 加一个包装函数确保参数传递正确

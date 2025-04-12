@@ -4,7 +4,16 @@ import ChatBubble from '../ChatBubble';
 import './Message.css';
 
 const Message = ({ message, showChinese, onPlayAudio, onReplayAudio, isPlaying }) => {
-  const { message_id, content, audio, role, status } = message;
+  const { message_id, content, role, status } = message;
+  
+  // 添加调试日志
+  console.log("Message 渲染:", { 
+    messageId: message_id, 
+    role, 
+    showChinese, 
+    contentType: typeof content,
+    hasChineseContent: content && typeof content === 'object' && 'chinese' in content
+  });
   
   let displayContent = null;
   
@@ -33,10 +42,25 @@ const Message = ({ message, showChinese, onPlayAudio, onReplayAudio, isPlaying }
   const handleReplay = async () => {
     if (isPlaying) return; // 如果正在播放，不允许重复点击
     
+    console.log("点击重放音频按钮:", {
+      messageId: message_id,
+      hasReplayCallback: typeof onReplayAudio === 'function',
+      hasPlayCallback: typeof onPlayAudio === 'function'
+    });
+    
     try {
       setIsLoading(true);
+      
+      // 首先尝试使用 onReplayAudio
       if (typeof onReplayAudio === 'function') {
         await onReplayAudio(message);
+      } 
+      // 如果没有 onReplayAudio，则尝试使用 onPlayAudio
+      else if (typeof onPlayAudio === 'function' && message_id) {
+        await onPlayAudio(message_id);
+      }
+      else {
+        console.warn("没有可用的音频播放方法");
       }
     } catch (error) {
       console.error('音频重放失败:', error);
@@ -52,7 +76,7 @@ const Message = ({ message, showChinese, onPlayAudio, onReplayAudio, isPlaying }
           message={
             <>
               {displayContent}
-              {audio && (
+              {isAssistant && (
                 <button 
                   className={`replay-audio-btn ${isLoading ? 'loading' : ''} ${isPlaying ? 'playing' : ''}`}
                   onClick={handleReplay}

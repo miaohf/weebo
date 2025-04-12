@@ -27,7 +27,9 @@ function App() {
   console.log("App is rendering with:", { 
     hasMessages: Array.isArray(messages), 
     messageCount: Array.isArray(messages) ? messages.length : 0,
-    handleChatRequestType: typeof handleChatRequest
+    handleChatRequestType: typeof handleChatRequest,
+    showChinese: showChinese,
+    toggleLanguageType: typeof toggleLanguage
   });
   
   return (

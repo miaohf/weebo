@@ -276,10 +276,13 @@ const useChat = () => {
 
   // 将 playAudio 函数移到这里 - 在组件顶层定义
   const playAudio = useCallback(async (messageId) => {
+    console.log(`请求播放消息 ${messageId} 的音频`);
     try {
+      console.log(`调用 playMessageAudio API 播放消息 ${messageId}`);
       await playMessageAudio(messageId);
+      console.log(`消息 ${messageId} 的音频播放请求已发送`);
     } catch (err) {
-      console.error('播放音频失败:', err);
+      console.error(`播放消息 ${messageId} 的音频失败:`, err);
     }
   }, []);
 
@@ -828,7 +831,11 @@ const useChat = () => {
   // 在 useChat 中确保正确实现了 toggleLanguage 函数
   const toggleLanguage = useCallback(() => {
     console.log("切换语言 - 当前状态:", showChinese);
-    setShowChinese(prev => !prev); // 切换语言显示
+    setShowChinese(prev => {
+      const newValue = !prev;
+      console.log("切换语言 - 新状态:", newValue);
+      return newValue;
+    }); // 切换语言显示
   }, [showChinese]); // 添加依赖
 
   useEffect(() => {
