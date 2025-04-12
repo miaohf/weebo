@@ -1,7 +1,9 @@
 import React from 'react';
+import { ThemeProvider } from './context/ThemeContext';
 import ChatContainer from './components/Chat/ChatContainer';
 import LanguageToggle from './components/Controls/LanguageToggle';
 import SettingsMenu from './components/Controls/SettingsMenu';
+import ThemeToggle from './components/Controls/ThemeToggle';
 import useChat from './hooks/useChat';
 import './App.css';
 
@@ -29,37 +31,40 @@ function App() {
   });
   
   return (
-    <div className="App">
-      <header className="App-header">
-        <div className="logo">
-          <h1>Chat Assistant</h1>
-        </div>
+    <ThemeProvider>
+      <div className="App">
+        <header className="App-header">
+          <div className="logo">
+            <h1>Chat Assistant</h1>
+          </div>
+          
+          <div className="header-controls">
+            <ThemeToggle />
+            <LanguageToggle 
+              showChinese={showChinese} 
+              onToggle={toggleLanguage} 
+            />
+            <SettingsMenu
+              selectedSpeaker={selectedSpeaker}
+              speakers={availableSpeakers}
+              onChangeSpeaker={setSelectedSpeaker}
+              onClearHistory={clearHistory}
+            />
+          </div>
+        </header>
         
-        <div className="header-controls">
-          <LanguageToggle 
-            showChinese={showChinese} 
-            onToggle={toggleLanguage} 
-          />
-          <SettingsMenu
+        <main>
+          <ChatContainer
+            messages={messages}
+            isLoading={isLoading}
+            onSendMessage={handleChatRequest}
+            onPlayAudio={playAudio}
+            showChinese={showChinese}
             selectedSpeaker={selectedSpeaker}
-            speakers={availableSpeakers}
-            onChangeSpeaker={setSelectedSpeaker}
-            onClearHistory={clearHistory}
           />
-        </div>
-      </header>
-      
-      <main>
-        <ChatContainer
-          messages={messages}
-          isLoading={isLoading}
-          onSendMessage={handleChatRequest}
-          onPlayAudio={playAudio}
-          showChinese={showChinese}
-          selectedSpeaker={selectedSpeaker}
-        />
-      </main>
-    </div>
+        </main>
+      </div>
+    </ThemeProvider>
   );
 }
 

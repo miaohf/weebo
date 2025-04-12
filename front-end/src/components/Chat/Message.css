@@ -11,13 +11,13 @@
 
 .message.user {
   align-self: flex-end;
-  background-color: #eaf5f5;
+  background-color: #1e88e5;
   margin-left: auto;
 }
 
 .message.assistant {
   align-self: flex-start;
-  background-color: #f7f4ef;
+  background-color: #e3f2fd;
   margin-right: auto;
 }
 
@@ -29,13 +29,13 @@
 }
 
 .user .message-bubble {
-  background-color: #0084ff;
+  background-color: #1e88e5;
   color: white;
 }
 
 .assistant .message-bubble {
-  background-color: #f0f2f5;
-  color: #333;
+  background-color: #e3f2fd;
+  color: #0d47a1;
 }
 
 .message-header {
@@ -228,80 +228,75 @@
 
 @media (prefers-color-scheme: dark) {
   .message.user .message-bubble {
-    background-color: #5070d6;
+    background-color: #7c4dff;
+    color: white;
   }
   
   .message.assistant .message-bubble {
-    background-color: #2a2a2e;
-    border-color: #3a3a3e;
+    background-color: #311b92;
+    color: #b388ff;
   }
-}
 
-.message.user .message-bubble::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: -10px;
-  width: 0;
-  height: 0;
-  border: 10px solid transparent;
-  border-left-color: #6a8eff;
-  border-right: 0;
-  border-top: 0;
-  margin-top: 0;
-}
+  .message-english,
+  .message-chinese,
+  .audio-message-text,
+  .replay-audio-btn,
+  .play-audio-button,
+  .message-role,
+  .message-header,
+  .voice-indicator,
+  .message-content p {
+    color: inherit;
+  }
 
-.message.assistant .message-bubble::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -10px;
-  width: 0;
-  height: 0;
-  border: 10px solid transparent;
-  border-right-color: #f2f2f7;
-  border-left: 0;
-  border-top: 0;
-  margin-top: 0;
-}
-
-@media (prefers-color-scheme: dark) {
   .message.user .message-bubble::after {
-    border-left-color: #5070d6;
+    border-left-color: #7c4dff;
   }
   
   .message.assistant .message-bubble::after {
-    border-right-color: #2a2a2e;
+    border-right-color: #311b92;
+  }
+
+  .message.user .audio-message-icon {
+    color: white;
+  }
+
+  .message.assistant .audio-message-icon {
+    color: #b388ff;
+  }
+
+  .play-audio-button.playing {
+    color: inherit;
+  }
+
+  .play-audio-button:hover:not(:disabled) {
+    opacity: 0.8;
   }
 }
 
-/* 可选配色方案 - 可以通过增加类名到 .message 元素上启用 */
-
-/* 柔和主题 */
+/* 可选配色方案 */
 .theme-soft .message.user .message-bubble {
-  background-color: #8ca0e0;
+  background-color: #64b5f6;
 }
 
 .theme-soft .message.assistant .message-bubble {
-  background-color: #f8f8fa;
+  background-color: #e8f5e9;
 }
 
-/* 灰度主题 */
 .theme-gray .message.user .message-bubble {
-  background-color: #6b7280;
+  background-color: #78909c;
 }
 
 .theme-gray .message.assistant .message-bubble {
-  background-color: #f3f4f6;
+  background-color: #eceff1;
 }
 
-/* 绿色主题 */
 .theme-green .message.user .message-bubble {
-  background-color: #4ade80;
+  background-color: #4caf50;
 }
 
 .theme-green .message.assistant .message-bubble {
-  background-color: #f0fdf4;
+  background-color: #e8f5e9;
 }
 
 /* 添加加载指示器样式 */
@@ -390,22 +385,69 @@ pre, code {
 }
 
 .replay-audio-btn {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
   background: transparent;
+  color: inherit;
   border: none;
-  cursor: pointer;
-  padding: 4px;
   border-radius: 50%;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #666;
+  cursor: pointer;
   transition: all 0.2s ease;
+  margin-left: 8px;
+  padding: 0;
+  position: relative;
+  float: right;
 }
 
-.replay-audio-btn:hover {
-  background: rgba(0, 0, 0, 0.1);
-  color: #333;
-} 
+.replay-audio-btn:hover:not(:disabled) {
+  opacity: 0.8;
+  transform: scale(1.1);
+}
+
+.replay-audio-btn.loading {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.replay-audio-btn.playing {
+  animation: pulse 1.5s infinite;
+  cursor: not-allowed;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.loading-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--button-bg);
+  border-top: 2px solid var(--loading-dot);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.message-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.message-image {
+  max-width: 200px;
+  max-height: 200px;
+  border-radius: 8px;
+  object-fit: cover;
+  box-shadow: 0 2px 4px var(--shadow-color);
+}

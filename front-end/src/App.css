@@ -18,53 +18,48 @@ body {
 }
 
 .App {
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  width: 100%;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .App-header {
-  background-color: #f8f9fa;
-  padding: 0 20px;
-  height: 50px;
-  position: relative;
+  padding: 1rem 2rem;
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
-  z-index: 100;
-  border: none;
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--bg-color);
 }
 
 .logo {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  flex: 1;
   display: flex;
-  align-items: center;
   justify-content: center;
 }
 
 .logo h1 {
   margin: 0;
-  font-size: 18px;
-  color: #333;
+  font-size: 1.5rem;
+  color: var(--text-color);
   white-space: nowrap;
 }
 
 .header-controls {
-  position: absolute;
-  right: 20px;
   display: flex;
+  gap: 1rem;
   align-items: center;
-  gap: 8px;
-  flex-wrap: nowrap;
 }
 
 main {
   flex: 1;
-  overflow: hidden;
-  position: relative;
+  padding: 1rem;
+  background-color: var(--chat-bg);
+  display: flex;
+  flex-direction: column;
 }
 
 .app-container {
@@ -79,37 +74,30 @@ main {
 
 /* 响应式设计 */
 @media (max-width: 768px) {
-  .logo {
-    min-width: 130px;
+  .App-header {
+    padding: 1rem;
+  }
+  
+  .logo h1 {
+    font-size: 1.2rem;
   }
   
   .header-controls {
-    gap: 8px;
+    gap: 0.5rem;
   }
 }
 
-/* 小屏幕进一步优化 */
 @media (max-width: 576px) {
-  .logo {
-    min-width: 120px;
+  .App-header {
+    padding: 0.5rem;
   }
   
-  .App-header {
-    padding: 0 10px;
+  .logo h1 {
+    font-size: 1rem;
   }
   
   .header-controls {
-    right: 10px;
-    gap: 6px;
-  }
-  
-  /* 在超小屏幕上使用图标替代文字按钮 */
-  .header-controls .control-item .button-text {
-    display: none;
-  }
-  
-  .header-controls .control-item .button-icon {
-    display: inline-block;
+    gap: 0.25rem;
   }
 }
 

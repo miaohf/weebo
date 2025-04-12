@@ -60,6 +60,25 @@
   --header-height: 60px;
   --chat-max-width: 1200px;
   --sidebar-width: 280px;
+  
+  /* 亮色主题 */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f7f7f7;
+  --bg-tertiary: #f0f0f0;
+  --text-primary: #333333;
+  --text-secondary: #666666;
+  --user-bubble: linear-gradient(135deg, #4a90e2, #357abd);
+  --assistant-bubble: linear-gradient(135deg, #f0f0f0, #e0e0e0);
+  --user-text: #ffffff;
+  --assistant-text: #333333;
+  --input-bg: #ffffff;
+  --input-border: #e2e8f0;
+  --input-text: #333333;
+  --button-bg: #f0f0f0;
+  --button-hover: #e0e0e0;
+  --button-text: #333333;
+  --loading-dot: #4a90e2;
+  --shadow-color: rgba(0, 0, 0, 0.1);
 }
 
 /* 暗黑模式 */
@@ -71,4 +90,25 @@
     --text-secondary: var(--gray-300);
     --border-color: var(--gray-700);
   }
+}
+
+[data-theme="dark"] {
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #1f1f1f;
+  --bg-tertiary: #2d2d2d;
+  --text-primary: #e2e8f0;
+  --text-secondary: #a0aec0;
+  --border-color: #2d3748;
+  --user-bubble: linear-gradient(135deg, #2b6cb0, #2c5282);
+  --assistant-bubble: linear-gradient(135deg, #2d2d2d, #1a1a1a);
+  --user-text: #ffffff;
+  --assistant-text: #e2e8f0;
+  --input-bg: #2d2d2d;
+  --input-border: #3d3d3d;
+  --input-text: #e2e8f0;
+  --button-bg: #2d2d2d;
+  --button-hover: #3d3d3d;
+  --button-text: #e2e8f0;
+  --loading-dot: #4a90e2;
+  --shadow-color: rgba(0, 0, 0, 0.3);
 } 

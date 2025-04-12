@@ -1,26 +1,47 @@
 /* 输入框容器 */
 .chat-input-container {
   display: flex;
-  padding: 12px 16px;
-  background-color: #fff;
-  border: none;
+  gap: 10px;
+  padding: 15px;
+  background-color: var(--bg-secondary);
+  border-top: 1px solid var(--border-color);
+  border-radius: 0 0 8px 8px;
+}
+
+.input-wrapper {
+  flex: 1;
+  display: flex;
   align-items: center;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--input-border);
+  border-radius: 20px;
+  padding: 8px 15px;
+  transition: border-color 0.3s ease;
+}
+
+.input-wrapper:focus-within {
+  border-color: var(--user-bubble);
+  box-shadow: 0 0 0 2px var(--shadow-color);
 }
 
 /* 输入框 */
 .chat-input {
   flex: 1;
-  padding: 0;
-  border-radius: 20px;
   border: none;
-  background-color: #f5f5f5;
-  font-size: 15px;
   outline: none;
-  box-shadow: none;
+  background: transparent;
+  color: var(--input-text);
+  font-size: 1rem;
+  resize: none;
+  max-height: 150px;
+  min-height: 24px;
+  line-height: 1.5;
+  padding: 4px 0;
 }
 
-.chat-input form {
-  width: 100%;
+.chat-input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.5;
 }
 
 /* 输入控件布局 */
@@ -29,7 +50,7 @@
   align-items: center;
   gap: 10px;
   width: 100%;
-  background-color: #f5f5f5;
+  background-color: var(--bg-tertiary);
   border-radius: 20px;
   padding: 6px 8px;
 }
@@ -58,27 +79,38 @@
 /* 模式切换和图片上传按钮样式 */
 .mode-toggle-button,
 .image-upload-button {
-  color: #5e6473;
+  color: var(--text-secondary);
 }
 
 .mode-toggle-button:hover,
 .image-upload-button:hover {
-  background-color: #e9eaed;
+  background-color: var(--button-hover);
 }
 
 /* 发送按钮样式 - 只修改颜色，保持大小一致 */
 .send-button {
-  color: #0084ff; /* 蓝色 */
-  background-color: transparent; /* 透明背景 */
+  background: var(--user-bubble);
+  color: var(--user-text);
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.2s ease, opacity 0.2s ease;
 }
 
 .send-button:hover {
-  background-color: #e9eaed; /* 悬停时的浅灰色背景 */
+  transform: scale(1.05);
+  opacity: 0.9;
 }
 
 .send-button:disabled {
-  color: #cfd3dc; /* 禁用状态的颜色 */
+  opacity: 0.5;
   cursor: not-allowed;
+  transform: none;
 }
 
 /* 文本输入区域 */
@@ -93,7 +125,8 @@
   font-family: inherit;
   font-size: 15px;
   line-height: 1.4;
-  background-color: #f5f5f5;
+  background-color: var(--bg-tertiary);
+  color: var(--input-text);
   outline: none;
 }
 
@@ -101,10 +134,10 @@
 .record-button {
   flex: 1;
   min-height: 40px;
-  background-color: #f0f2f5;
-  border: 1px solid #ddd;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--input-border);
   border-radius: 22px;
-  color: #666;
+  color: var(--text-secondary);
   font-size: 15px;
   cursor: pointer;
   user-select: none;
@@ -127,7 +160,7 @@
   max-width: 200px;
   border-radius: 8px;
   overflow: hidden;
-  border: 1px solid #ddd;
+  border: 1px solid var(--input-border);
 }
 
 .image-preview {
@@ -163,14 +196,18 @@
 
 /* 响应式调整 */
 @media (max-width: 768px) {
-  .action-button {
-    width: 32px;
-    height: 32px;
+  .chat-input-container {
+    padding: 10px;
   }
   
-  .action-button svg {
-    width: 18px;
-    height: 18px;
+  .input-wrapper {
+    padding: 6px 12px;
+  }
+  
+  .send-button,
+  .upload-button {
+    width: 36px;
+    height: 36px;
   }
 }
 
@@ -178,4 +215,22 @@
 .bottom-controls {
   border-top: none;
   box-shadow: none;
+}
+
+.upload-button {
+  background: var(--button-bg);
+  color: var(--button-text);
+  border: 1px solid var(--input-border);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.upload-button:hover {
+  background-color: var(--button-hover);
 } 
