@@ -245,11 +245,42 @@ const PromisePlayer = {
 };
 
 const useChat = () => {
-  const [messages, setMessages] = useState([]);
+  // 尝试从 localStorage 加载消息历史
+  const loadInitialMessages = () => {
+    try {
+      const savedMessages = localStorage.getItem('chatMessages');
+      return savedMessages ? JSON.parse(savedMessages) : [];
+    } catch (error) {
+      console.error('加载聊天历史失败:', error);
+      return [];
+    }
+  };
+  
+  // 尝试从 localStorage 加载设置
+  const loadSettings = (key, defaultValue) => {
+    try {
+      const savedSetting = localStorage.getItem(key);
+      return savedSetting !== null ? JSON.parse(savedSetting) : defaultValue;
+    } catch (error) {
+      console.error(`加载设置 ${key} 失败:`, error);
+      return defaultValue;
+    }
+  };
+  
+  // 保存设置到 localStorage
+  const saveSettings = (key, value) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch (error) {
+      console.error(`保存设置 ${key} 失败:`, error);
+    }
+  };
+
+  const [messages, setMessages] = useState(loadInitialMessages());
   const [isLoading, setIsLoading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
-  const [showChinese, setShowChinese] = useState(false);
+  const [showChinese, setShowChinese] = useState(loadSettings('showChinese', false));
   
   const recentMessageIds = useRef([]);
 
@@ -272,7 +303,26 @@ const useChat = () => {
   });
 
   // 在 useChat 钩子开始处添加自动播放配置
-  const [autoPlayAudio, setAutoPlayAudio] = useState(true);
+  const [autoPlayAudio, setAutoPlayAudio] = useState(loadSettings('autoPlayAudio', true));
+
+  // 添加一个包装函数来保存 showChinese 状态
+  const setShowChineseWithSave = useCallback((value) => {
+    const newValue = typeof value === 'function' ? value(showChinese) : value;
+    setShowChinese(newValue);
+    saveSettings('showChinese', newValue);
+  }, [showChinese]);
+  
+  // 添加一个包装函数来保存 autoPlayAudio 状态
+  const setAutoPlayAudioWithSave = useCallback((value) => {
+    const newValue = typeof value === 'function' ? value(autoPlayAudio) : value;
+    setAutoPlayAudio(newValue);
+    saveSettings('autoPlayAudio', newValue);
+  }, [autoPlayAudio]);
+
+  // 添加切换函数
+  const toggleAutoPlay = useCallback(() => {
+    setAutoPlayAudioWithSave(prev => !prev);
+  }, [setAutoPlayAudioWithSave]);
 
   // 将 playAudio 函数移到这里 - 在组件顶层定义
   const playAudio = useCallback(async (messageId) => {
@@ -356,11 +406,6 @@ const useChat = () => {
       
       return updatedMessages;
     });
-  }, []);
-
-  // 添加切换函数
-  const toggleAutoPlay = useCallback(() => {
-    setAutoPlayAudio(prev => !prev);
   }, []);
 
   // 修改 handleAudioData 函数
@@ -644,6 +689,10 @@ const useChat = () => {
     try {
       await fetch(`${API_URL}/chat/clear`, { method: 'POST' });
       setMessages([]);
+      
+      // 清除本地存储的消息
+      localStorage.removeItem('chatMessages');
+      console.log('已清除本地存储的聊天记录');
     } catch (err) {
       setError('清空历史失败');
       console.error(err);
@@ -831,12 +880,12 @@ const useChat = () => {
   // 在 useChat 中确保正确实现了 toggleLanguage 函数
   const toggleLanguage = useCallback(() => {
     console.log("切换语言 - 当前状态:", showChinese);
-    setShowChinese(prev => {
+    setShowChineseWithSave(prev => {
       const newValue = !prev;
       console.log("切换语言 - 新状态:", newValue);
       return newValue;
-    }); // 切换语言显示
-  }, [showChinese]); // 添加依赖
+    });
+  }, [showChinese, setShowChineseWithSave]);
 
   useEffect(() => {
     // 尝试解锁音频自动播放
@@ -893,10 +942,16 @@ const useChat = () => {
     console.log("======================");
   }, []);
 
-  // 添加 speaker 相关状态
-  const [selectedSpeaker, setSelectedSpeaker] = useState('default');
+  // 在 useChat.js 中添加 selectedSpeaker 状态
+  const [selectedSpeaker, setSelectedSpeaker] = useState(loadSettings('selectedSpeaker', 'default'));
+  
+  // 添加一个包装函数来保存 selectedSpeaker 状态
+  const setSelectedSpeakerWithSave = useCallback((speaker) => {
+    setSelectedSpeaker(speaker);
+    saveSettings('selectedSpeaker', speaker);
+  }, []);
 
-  // 确保导出speaker相关状态和函数
+  // 确保导出包装过的setter函数
   return {
     messages,
     setMessages,
@@ -911,7 +966,7 @@ const useChat = () => {
     error,
     setError,
     showChinese,
-    setShowChinese,
+    setShowChinese: setShowChineseWithSave,
     playAudio,
     audioSegmentsCache,
     currentPlayback,
@@ -921,7 +976,7 @@ const useChat = () => {
     toggleAutoPlay,
     debugAudioPlayback,
     selectedSpeaker,
-    setSelectedSpeaker
+    setSelectedSpeaker: setSelectedSpeakerWithSave
   };
 };
 
