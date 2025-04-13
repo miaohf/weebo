@@ -143,11 +143,11 @@ const MessageList = ({ onAudioData, ...props }) => {
         <div className="empty-chat">Start a new conversation?</div>
       ) : (
         props.messages.map((message, index) => {
-          console.log(`渲染消息 ${index}:`, {
-            id: message.id || message.message_id,
-            role: message.role,
-            hasAudio: !!message.audio
-          });
+          // console.log(`渲染消息 ${index}:`, {
+          //   id: message.id || message.message_id,
+          //   role: message.role,
+          //   hasAudio: !!message.audio
+          // });
           
           return (
             <Message 

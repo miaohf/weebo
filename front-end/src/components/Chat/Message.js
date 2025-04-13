@@ -12,16 +12,16 @@ const Message = ({ message, showChinese, onPlayAudio, onReplayAudio, isPlaying }
   const isAudioComplete = !total_segments || (segment_index !== undefined && total_segments && segment_index === total_segments - 1);
   
   // 添加调试日志
-  console.log("Message 渲染:", { 
-    messageId: message_id, 
-    role, 
-    showChinese, 
-    contentType: typeof content,
-    hasChineseContent: content && typeof content === 'object' && 'chinese' in content,
-    segment_index,
-    total_segments,
-    isAudioComplete
-  });
+  // console.log("Message 渲染:", { 
+  //   messageId: message_id, 
+  //   role, 
+  //   showChinese, 
+  //   contentType: typeof content,
+  //   hasChineseContent: content && typeof content === 'object' && 'chinese' in content,
+  //   segment_index,
+  //   total_segments,
+  //   isAudioComplete
+  // });
   
   const handleReplay = async () => {
     if (isPlaying) return; // 如果正在播放，不允许重复点击

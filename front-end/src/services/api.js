@@ -165,7 +165,7 @@ export const sendChatMessageStreaming = async (message, files = [], messageType 
       const text = decoder.decode(value, { stream: true });
       buffer += text;
       
-      console.log("收到流数据块，长度:", text.length);
+      // console.log("收到流数据块，长度:", text.length);
       
       // 处理完整的行
       const lines = buffer.split('\n');

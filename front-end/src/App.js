@@ -56,13 +56,13 @@ function App() {
   const availableSpeakers = ['default', 'female', 'male'];
   
   // 添加调试日志
-  console.log("App is rendering with:", { 
-    hasMessages: Array.isArray(messages), 
-    messageCount: Array.isArray(messages) ? messages.length : 0,
-    handleChatRequestType: typeof handleChatRequest,
-    showChinese: showChinese,
-    toggleLanguageType: typeof toggleLanguage
-  });
+  // console.log("App is rendering with:", { 
+  //   hasMessages: Array.isArray(messages), 
+  //   messageCount: Array.isArray(messages) ? messages.length : 0,
+  //   handleChatRequestType: typeof handleChatRequest,
+  //   showChinese: showChinese,
+  //   toggleLanguageType: typeof toggleLanguage
+  // });
   
   return (
     <ThemeProvider>
