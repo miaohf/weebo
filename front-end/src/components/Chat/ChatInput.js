@@ -165,7 +165,7 @@ const ChatInput = ({ onSendMessage, isLoading, selectedSpeaker }) => {
               <textarea
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder={selectedImage ? "Add image description..." : "Please enter your message..."}
+                placeholder={selectedImage ? "Add image description..." : "Your message here..."}
                 disabled={isLoading}
                 rows={1}
                 onKeyPress={(e) => {

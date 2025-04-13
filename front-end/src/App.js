@@ -69,7 +69,10 @@ function App() {
       <div className="App">
         <header className={`App-header ${hideHeader ? 'hidden' : ''}`}>
           <div className="logo">
-            <h1>Chat Assistant</h1>
+            <div className="logo-icon">
+              <img src="/chatbot.png" alt="Chat Bot Logo" />
+            </div>
+            <h1>Chat Bot</h1>
           </div>
           
           <div className="header-controls">
