@@ -63,44 +63,87 @@ export const sendChatMessage = async (message, files = [], messageType = 'text',
 };
 
 /**
- * 使用 Fetch API 进行真正的流式处理
- * 
- * 此方法实现了真正的流式数据处理，可以在接收到部分数据时就开始处理，
- * 无需等待整个响应完成。特别适合处理长时间运行的请求或大型响应。
- * 
- * 适用场景：
- * - 实时显示生成内容（如 AI 聊天的打字机效果）
- * - 长时间运行的请求需要立即反馈
- * - 大型响应需要分块处理以减少内存占用
- * 
- * @param {string} message - 要发送的消息文本
- * @param {File[]} files - 要上传的文件数组
- * @param {string} messageType - 消息类型，默认为 'text'
- * @param {string} speaker - 语音发言人，默认为 'default'
+ * 以流式方式发送聊天消息
+ * @param {string} message - 聊天消息文本
+ * @param {Array} files - 附加文件数组
+ * @param {string} messageType - 消息类型 (text, image, voice等)
+ * @param {string} speaker - 合成语音的发言人
  * @param {Function} onChunk - 每接收到一个数据块时的回调函数
+ * @param {boolean} streamAudio - 是否流式处理音频，默认为true
  * @returns {Promise<boolean>} 流处理完成后返回 true
  * @throws {Error} 请求失败时抛出错误
  */
-export const sendChatMessageStreaming = async (message, files = [], messageType = 'text', speaker = 'default', onChunk) => {
+export const sendChatMessageStreaming = async (message, files = [], messageType = 'text', speaker = 'default', onChunk, streamAudio = true) => {
   try {
-    const formData = new FormData();
-    formData.append('message', message);
-    formData.append('message_type', messageType);
-    formData.append('speaker', speaker);
+    // 详细记录入参信息
+    console.log('======= 发送聊天消息流 =======');
+    console.log('消息类型:', messageType);
+    console.log('消息内容:', message);
+    console.log('files 参数:', files);
+    console.log('files 类型:', typeof files);
+    console.log('files 是否数组:', Array.isArray(files));
+    console.log('files 长度:', files ? files.length : 0);
     
+    // 准备JSON数据
+    const requestData = {
+      message_type: messageType,
+      message: message,
+      speaker: speaker,
+      stream_audio: streamAudio
+    };
+    
+    // 如果有文件，处理文件数据
     if (files && files.length > 0) {
-      files.forEach((file, index) => {
-        formData.append(`file_${index}`, file);
+      const file = files[0]; // 目前只处理一个文件
+      
+      console.log(`检查文件:`, {
+        名称: file.name,
+        大小: file.size,
+        类型: file.type,
+        是否File对象: file instanceof File,
+        是否Blob对象: file instanceof Blob
       });
+      
+      if (file instanceof File || file instanceof Blob) {
+        // 如果是语音消息，将文件转换为base64
+        if (messageType === 'voice') {
+          try {
+            const arrayBuffer = await file.arrayBuffer();
+            const uint8Array = new Uint8Array(arrayBuffer);
+            let base64String = btoa(String.fromCharCode.apply(null, uint8Array));
+            
+            requestData.audio_data = base64String;
+            requestData.audio_mime_type = file.type;
+            
+            console.log(`✅ 成功转换音频文件为Base64, 长度: ${base64String.length} 字符, MIME类型: ${file.type}`);
+          } catch (err) {
+            console.error(`❌ 转换音频文件为Base64失败:`, err);
+          }
+        }
+        // 这里可以添加其他类型文件的处理，例如图像
+      } else {
+        console.error(`❌ 文件不是有效的File或Blob对象:`, file);
+      }
     }
     
-    // 使用fetch API代替axios
+    // 检查关键参数
+    console.log('发送JSON请求:', {
+      url: `${API_URL}/chat`,
+      方法: 'POST',
+      消息类型: messageType,
+      有音频数据: Boolean(requestData.audio_data),
+      音频数据长度: requestData.audio_data ? requestData.audio_data.length : 0,
+      流式音频: streamAudio
+    });
+    
+    // 使用fetch API发送JSON请求
     const response = await fetch(`${API_URL}/chat`, {
       method: 'POST',
-      body: formData,
       headers: {
+        'Content-Type': 'application/json',
         'Accept': 'application/x-ndjson'
-      }
+      },
+      body: JSON.stringify(requestData)
     });
     
     if (!response.ok) {

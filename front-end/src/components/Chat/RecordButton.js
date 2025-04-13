@@ -53,12 +53,29 @@ function RecordButton({ onRecordingComplete, isProcessing }) {
   const stopRecording = async () => {
     if (!isRecording) return;
     
-    const recordingData = await recorderRef.current.stopRecording();
-    setIsRecording(false);
-    setRecordingTime(0);
-    
-    if (recordingData && onRecordingComplete) {
-      onRecordingComplete(recordingData);
+    try {
+      const recordingData = await recorderRef.current.stopRecording();
+      setIsRecording(false);
+      setRecordingTime(0);
+      
+      if (recordingData && onRecordingComplete) {
+        console.log('录音完成，数据大小:', 
+          recordingData.blob ? recordingData.blob.size + ' bytes' : '无blob',
+          '持续时间:', recordingData.duration + 'ms');
+        
+        // 确保返回的数据包含音频blob
+        if (!recordingData.blob || recordingData.blob.size === 0) {
+          console.error('警告: 录音完成但没有音频数据!');
+        }
+        
+        onRecordingComplete(recordingData);
+      } else {
+        console.error('录音失败: 没有录音数据或回调函数');
+      }
+    } catch (error) {
+      console.error('停止录音时出错:', error);
+      setIsRecording(false);
+      setRecordingTime(0);
     }
   };
 

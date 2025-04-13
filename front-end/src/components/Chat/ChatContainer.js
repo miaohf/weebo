@@ -23,10 +23,21 @@ const ChatContainer = ({
   });
   
   // 加一个包装函数确保参数传递正确
-  const handleSendMessage = (message, files, messageType, speaker) => {
-    console.log("handleSendMessage called with:", { message, files, messageType, speaker });
+  const handleSendMessage = (message, files, messageType, speaker, streamAudio = true) => {
+    console.log("handleSendMessage called with:", { message, files, messageType, speaker, streamAudio });
+    
+    // 检查和记录文件信息
+    if (files && files.length > 0) {
+      files.forEach((file, index) => {
+        console.log(`文件 ${index}: ${file.name}, 大小: ${file.size} bytes, 类型: ${file.type}`);
+      });
+    } else if (messageType === 'voice') {
+      console.error("警告: 语音消息但没有文件!");
+    }
+    
     if (typeof onSendMessage === 'function') {
-      onSendMessage(message, files, messageType, speaker);
+      // 确保传递所有参数，包括 streamAudio
+      onSendMessage(message, files, messageType, speaker, streamAudio);
     } else {
       console.error("onSendMessage is not a function in ChatContainer");
     }

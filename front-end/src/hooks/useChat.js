@@ -580,9 +580,41 @@ const useChat = () => {
   }, [playAudio, setCurrentPlayback]); // 添加 playAudio 作为依赖项
 
   // 处理聊天请求
-  const handleChatRequest = useCallback(async (message, files = [], messageType = 'text', speaker = 'default') => {
+  const handleChatRequest = useCallback(async (
+    message, 
+    files = [], 
+    messageType = 'text', 
+    speaker = 'default',
+    streamAudio = true
+  ) => {
     // 在函数作用域顶部声明变量，这样在 try 和 catch 块中都可以访问
     const assistantMessageId = `assistant-${Date.now()}`;
+    
+    // 详细记录传入的参数
+    console.log('=== 处理聊天请求开始 ===');
+    console.log('消息类型:', messageType);
+    console.log('消息内容:', message);
+    console.log('speaker:', speaker);
+    console.log('streamAudio:', streamAudio);
+    console.log('files 参数类型:', typeof files);
+    console.log('files 是否数组:', Array.isArray(files));
+    console.log('files 长度:', files ? files.length : 0);
+    
+    if (messageType === 'voice' && (!files || files.length === 0)) {
+      console.error('❌ 错误: 语音消息缺少音频文件!');
+    }
+    
+    if (files && files.length > 0) {
+      files.forEach((file, index) => {
+        if (file instanceof File || file instanceof Blob) {
+          console.log(`文件 ${index}: 大小=${file.size}字节, 类型=${file.type}, 名称=${file.name}`);
+        } else {
+          console.error(`❌ 错误: 文件 ${index} 不是有效的File或Blob对象:`, file);
+        }
+      });
+    } else if (messageType === 'voice' || messageType === 'image') {
+      console.error(`❌ 错误: ${messageType}类型消息但files为空!`);
+    }
     
     try {
       setIsLoading(true);
@@ -619,6 +651,15 @@ const useChat = () => {
       
       // 累积的消息对象
       let currentMessage = { ...initialAssistantMessage };
+      
+      // 记录发送到API的参数
+      console.log('准备发送到sendChatMessageStreaming的参数:', {
+        message,
+        files: files ? `${files.length}个文件` : '无',
+        messageType,
+        speaker,
+        streamAudio
+      });
       
       // 使用流式API，提供回调函数处理每个数据块
       await sendChatMessageStreaming(
@@ -662,12 +703,14 @@ const useChat = () => {
               msg.message_id === assistantMessageId ? currentMessage : msg
             )
           );
-        }
+        },
+        streamAudio
       );
       
+      console.log('=== 处理聊天请求完成 ===');
       setIsLoading(false);
     } catch (err) {
-      console.error('发送消息失败:', err);
+      console.error('❌ 发送消息失败:', err);
       setError('发送消息失败');
       setIsLoading(false);
       
@@ -677,7 +720,7 @@ const useChat = () => {
           msg.message_id === assistantMessageId
             ? { 
                 ...msg, 
-                content: { english: '处理消息时出错', chinese: '处理消息时出错' }, 
+                content: { english: 'send message error', chinese: '发送消息失败' }, 
                 status: 'error' 
               }
             : msg
