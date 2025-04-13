@@ -72,7 +72,7 @@ function App() {
             <div className="logo-icon">
               <img src="/chatbot.png" alt="Chat Bot Logo" />
             </div>
-            <h1>Chat Bot</h1>
+            <h1>Alex ChatBot</h1>
           </div>
           
           <div className="header-controls">

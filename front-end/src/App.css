@@ -27,7 +27,7 @@ body {
 }
 
 .App-header {
-  padding: 1rem 1.5rem 1rem 1.5rem;
+  padding: 1rem 2rem 1rem 2rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -38,7 +38,7 @@ body {
   right: 0;
   z-index: 1000;
   transition: transform 0.3s ease;
-  height: 70px;
+  height: 90px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
@@ -53,40 +53,39 @@ body {
   transform: none;
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-left: 25px;
+  gap: 12px;
+  margin-left: 5px;
+}
+
+/* 在大屏幕上添加标题居中的样式 */
+.logo h1 {
+  margin: 0;
+  font-size: 2.1rem;
+  color: var(--title-color);
+  white-space: nowrap;
+  font-weight: 800;
+  /* letter-spacing: 0.1px; */
+  text-shadow: 0 5px 5px rgba(0, 0, 0, 0.1);
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .logo-icon {
-  width: 60px;
-  height: 60px;
+  width: 38px;
+  height: 38px;
   display: flex;
   justify-content: center;
   align-items: center;
-  border-radius: 50%;
+  border-radius: 0;
   overflow: hidden;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
+  /* box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2); */
 }
 
 .logo-icon img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
-}
-
-.logo-icon svg {
-  width: 100%;
-  height: 100%;
-}
-
-.logo h1 {
-  margin: 0;
-  font-size: 2.5rem;
-  color: var(--text-color);
-  white-space: nowrap;
-  font-weight: 800;
-  letter-spacing: 0.5px;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  object-fit: contain;
 }
 
 .header-controls {
@@ -102,7 +101,7 @@ body {
 
 main {
   flex: 1;
-  padding-top: 60px; /* 直接使用与 header 高度相同的值 */
+  padding-top: 90px; /* 直接使用与 header 高度相同的值 */
   padding-left: 1rem;
   padding-right: 1rem;
   padding-bottom: 1rem;
@@ -124,20 +123,24 @@ main {
 /* 响应式设计 */
 @media (max-width: 768px) {
   .App-header {
-    padding: 1rem 1rem 1rem 2rem; /* 增加左侧内边距 */
+    padding: 1rem 1rem 1rem 2rem;
   }
   
   .logo {
-    margin-left: 5px; /* 在小屏幕上保持适当的左侧间距 */
+    margin-left: 5px; /* 保持与大屏幕相同 */
   }
   
+  /* 在小屏幕上取消标题居中的样式 */
   .logo h1 {
-    font-size: 1.8rem;
+    position: static;
+    left: auto;
+    transform: none;
+    font-size: 1.4rem;
   }
   
   .logo-icon {
-    width: 48px;
-    height: 48px;
+    width: 34px;
+    height: 34px;
   }
   
   .header-controls {
@@ -147,20 +150,20 @@ main {
 
 @media (max-width: 576px) {
   .App-header {
-    padding: 0.5rem 0.5rem 0.5rem 1.5rem; /* 增加左侧内边距 */
+    padding: 0.5rem 0.5rem 0.5rem 2rem; /* 与大屏幕左侧内边距保持一致 */
   }
   
   .logo {
-    margin-left: 3px; /* 在更小的屏幕上略微减少间距 */
+    margin-left: 5px; /* 保持一致 */
   }
   
   .logo h1 {
-    font-size: 1.5rem;
+    font-size: 1.2rem;
   }
   
   .logo-icon {
-    width: 40px;
-    height: 40px;
+    width: 30px;
+    height: 30px;
   }
   
   .header-controls {
@@ -170,11 +173,11 @@ main {
 
 @media (max-width: 350px) {
   .App-header {
-    padding: 0.5rem 6px 0.5rem 12px; /* 增加左侧内边距 */
+    padding: 0.5rem 6px 0.5rem 1rem; /* 调整但保持足够间距 */
   }
   
   .logo {
-    margin-left: 0; /* 在最小屏幕上移除额外间距 */
+    margin-left: 0; /* 最小屏幕稍微紧凑一点 */
   }
   
   .logo h1 {
@@ -183,8 +186,8 @@ main {
   }
   
   .logo-icon {
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
   }
   
   .header-controls {

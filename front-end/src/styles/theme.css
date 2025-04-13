@@ -63,7 +63,9 @@
   
   /* 亮色主题 */
   --bg-color: #ffffff;
-  --text-color: #333333;
+  --text-color: var(--gray-600);
+  --title-color: #49678b;
+  --controller-color: var(--gray-500);
   --chat-bg: #f7f7f7;
   --input-bg: #ffffff;
   --input-border: #e2e8f0;
@@ -83,14 +85,16 @@
     --bg-main: var(--gray-900);
     --bg-light: var(--gray-800);
     --text-primary: var(--gray-100);
-    --text-secondary: var(--gray-300);
+    --text-secondary: var(--gray-600);
     --border-color: var(--gray-700);
   }
 }
 
 [data-theme="dark"] {
   --bg-color: #1f1f1f;
-  --text-color: #d7d9db;
+  --text-color: var(--gray-100);
+  --title-color: #6292ce;
+  --controller-color: var(--gray-300);
   --border-color: #2d3748;
   --chat-bg: #1f1f1f;
   --input-bg: #2d2d2d;

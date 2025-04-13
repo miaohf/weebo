@@ -79,7 +79,7 @@
 .mode-toggle-button,
 .image-upload-button {
   background: var(--bg-color);
-  color: var(--text-color);
+  color: var(--controller-color);
 }
 
 .mode-toggle-button:hover,
@@ -90,7 +90,7 @@
 /* 发送按钮样式 - 只修改颜色，保持大小一致 */
 .send-button {
   background: var(--bg-color);
-  color: var(--text-color);
+  color: var(--controller-color);
   border: none;
   border-radius: 50%;
   display: flex;
