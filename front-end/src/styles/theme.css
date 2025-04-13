@@ -64,7 +64,7 @@
   /* 亮色主题 */
   --bg-color: #ffffff;
   --text-color: var(--gray-600);
-  --title-color: #49678b;
+  --title-color: #3e73b3;
   --controller-color: var(--gray-500);
   --chat-bg: #f7f7f7;
   --input-bg: #ffffff;
@@ -93,7 +93,7 @@
 [data-theme="dark"] {
   --bg-color: #1f1f1f;
   --text-color: var(--gray-100);
-  --title-color: #6292ce;
+  --title-color: #76a5df;
   --controller-color: var(--gray-300);
   --border-color: #2d3748;
   --chat-bg: #1f1f1f;
