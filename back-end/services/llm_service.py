@@ -3,26 +3,44 @@ import requests
 import json
 import re
 from utils.logging_utils import debug, info, error
-from config import OLLAMA_API_URL, OLLAMA_MODEL
+from core.config import settings
 from resources.prompts import SYSTEM_PROMPT
 from typing import Dict, List, Optional, Any, Union
+import time
 
 class LLMService:
     """Service for interacting with Large Language Models."""
     
-    def __init__(self, api_url: str = None, model: str = None):
+    def __init__(self, api_url: str = None, model: str = None, api_type: str = "ollama"):
         """Initialize the LLM service.
         
         Args:
             api_url: Ollama API URL (optional, default from config)
             model: The model name to use (optional, default from config)
+            api_type: API type to use, either "ollama" or "deepseek" (default: "ollama")
         """
         try:
-            self.api_url = api_url or OLLAMA_API_URL
-            self.model = model or OLLAMA_MODEL
-        except (ImportError, AttributeError):
+            self.api_type = api_type.lower()
+            
+            if self.api_type == "ollama":
+                self.api_url = api_url or settings.OLLAMA_API_URL
+                self.model = model or settings.OLLAMA_MODEL
+                info(f"使用Ollama API，模型: {self.model}, API地址: {self.api_url}")
+
+            elif self.api_type == "deepseek":
+                self.api_url = api_url or settings.DEEPSEEK_BASE_URL
+                self.api_key = settings.DEEPSEEK_API_KEY
+                self.model = model or settings.DEEPSEEK_MODEL
+                info(f"使用DeepSeek API，模型: {self.model}, API地址: {self.api_url}")
+            else:
+                raise ValueError(f"不支持的API类型: {self.api_type}")
+        except (ImportError, AttributeError) as e:
+            error(f"初始化LLM服务失败: {e}")
+            info("使用默认API配置")
+            self.api_type = "ollama"
             self.api_url = api_url or "http://localhost:11434"
             self.model = model or "llama2"
+            self.available_models = []
         
         self.llm = None
         self.messages = [
@@ -31,20 +49,14 @@ class LLMService:
                 "content": SYSTEM_PROMPT
             }
         ]
-        self.max_history = 10  # 限制历史消息数量，避免超出上下文窗口
+        self.max_history = 50  # 限制历史消息数量，避免超出上下文窗口
         
-        # Check available models
-        self.available_models = self._get_available_models()
-        if self.available_models:
-            debug(f"Available models: {', '.join(self.available_models)}")
-            
-            # If configured model is not available, use the first available model
-            if self.model not in self.available_models and self.available_models:
-                info(f"Model '{self.model}' not found. Using '{self.available_models[0]}' instead.")
-                self.model = self.available_models[0]
-    
     def _get_available_models(self):
         """Get list of available models from Ollama."""
+        # 只有Ollama支持获取可用模型列表
+        if self.api_type != "ollama":
+            return self.available_models
+            
         try:
             response = requests.get(f"{self.api_url}/api/tags", timeout=5)
             if response.status_code == 200:
@@ -85,7 +97,11 @@ class LLMService:
             
     def _sanitize_for_tts(self, text):
         """Remove emojis and other problematic characters for TTS"""
+        if not text:
+            return text
+            
         # Pattern to match emoji and other Unicode symbols
+        # 注意：这个正则表达式只匹配Unicode表情符号，不会影响中文字符(U+4E00至U+9FFF)和中文标点符号
         emoji_pattern = re.compile(
             "["
             "\U0001F600-\U0001F64F"  # emoticons
@@ -101,13 +117,63 @@ class LLMService:
             "\U000024C2-\U0001F251" 
             "]+", flags=re.UNICODE)
         
-        # Remove emojis
-        text = emoji_pattern.sub(r'', text)
+        # 替换表情符号为文本描述，而不是删除
+        text = emoji_pattern.sub(r'[表情]', text)
         
-        # Remove ASCII emoticons like :) :D etc.
-        text = re.sub(r'(:\)|:\(|:D|:P|:\/|;\)|\^_\^|<3)', '', text)
+        # 替换ASCII表情符号
+        text = re.sub(r':\)', '[笑脸]', text)
+        text = re.sub(r':\(', '[悲伤脸]', text)
+        text = re.sub(r':D', '[大笑脸]', text)
+        text = re.sub(r':P', '[吐舌头脸]', text)
+        text = re.sub(r':/', '[困惑脸]', text)
+        text = re.sub(r';\)', '[眨眼脸]', text)
+        text = re.sub(r'\^_\^', '[开心脸]', text)
+        text = re.sub(r'<3', '[爱心]', text)
         
         return text.strip()
+
+    def _detect_language(self, text):
+        """检测文本的主要语言
+        
+        Args:
+            text: 要检测语言的文本
+            
+        Returns:
+            str: 'english', 'chinese', 'other', 或 'unknown'
+        """
+        # 简单的语言检测逻辑
+        # 计算英文和中文字符的比例来确定主要语言
+        if not text or text.strip() == "":
+            debug("Empty text for language detection")
+            return 'unknown'
+            
+        # 计算英文字符数量
+        english_char_count = len(re.findall(r'[a-zA-Z]', text))
+        
+        # 计算中文字符数量
+        chinese_char_count = sum(1 for char in text if '\u4e00' <= char <= '\u9fff')
+        
+        # 计算总有效字符数量（排除空格、标点等）
+        total_chars = len(re.findall(r'[a-zA-Z\u4e00-\u9fff]', text))
+        
+        if total_chars == 0:
+            debug("No valid characters found for language detection")
+            # 如果没有有效字符，则根据是否包含中文标点来判断
+            chinese_punctuation = re.findall(r'[，。！？：；""''【】（）]', text)
+            if chinese_punctuation:
+                return 'chinese'
+            return 'unknown'
+            
+        english_ratio = english_char_count / total_chars
+        chinese_ratio = chinese_char_count / total_chars
+        
+        # 根据字符比例判断语言
+        if english_ratio > 0.5:
+            return 'english'
+        elif chinese_ratio > 0.3:  # 中文文本中可能包含英文单词，所以门槛低一些
+            return 'chinese'
+        else:
+            return 'other'
 
     def get_response(self, user_input: str) -> Optional[Dict[str, str]]:
         """Get bilingual response from LLM using two requests."""
@@ -121,82 +187,90 @@ class LLMService:
         debug(f"Current conversation history: {formatted_json}")
         
         try:
-            # 获取英文响应
-            english_content = self._get_english_content()
+            # 获取LLM响应
+            original_response = self._get_llm_response()
+            
+            if not original_response:
+                error("Empty LLM response")
+                return self._get_fallback_response("empty_response")
+            
+            # 添加响应到历史 - 使用原始响应
+            self.add_message("assistant", original_response)
+            
+            # 检测LLM响应的语言
+            detected_language = self._detect_language(user_input)
+            debug(f"Detected language of user_input: {detected_language}, user_input: {user_input}")
+            
+            # 根据检测到的语言获取翻译
+            translation = self._get_translated_message(original_response, detected_language)
 
-            # Apply sanitization before further processing
-            english_content = self._sanitize_for_tts(english_content)
-
-            # 添加用户消息到历史
-            self.add_message("assistant", english_content)
-            
-            debug(f"English content: {english_content}")
-            
-            # 如果英文内容是字典并包含 english 和 chinese 字段，直接使用
-            if isinstance(english_content, dict) and 'english' in english_content and 'chinese' in english_content:
-                return {
-                    "english": english_content.get("english", ""),
-                    "chinese": english_content.get("chinese", "")
-                }
-            
-            # 获取中文翻译
-            chinese_content = self._get_chinese_translation(english_content)
-            
-            # 确保返回的是纯文本，不是嵌套的 JSON
-            if isinstance(english_content, dict) and isinstance(english_content.get('english'), str):
-                english_content = english_content.get('english')
-            
-            if isinstance(chinese_content, dict) and isinstance(chinese_content.get('chinese'), str):
-                chinese_content = chinese_content.get('chinese')
-            
+            # 构造返回结果
             return {
-                "english": english_content,
-                "chinese": chinese_content
+                "original_text": original_response,
+                "translated_text": translation  
             }
-            
+
         except Exception as e:
-            error(f"Failed to get LLM response: {e}")
+            error(f"Failed to get LLM orginal response: {e}")
             import traceback
             debug(f"Exception details: {traceback.format_exc()}")
             
             return self._get_fallback_response("exception", error=str(e))
         
-    def _get_english_content(self):
-        """Get a regular English response from LLM."""
-        debug(f"Sending English request to Ollama API using model: {self.model}")
+    def _get_llm_response(self):
+        """Get a regular response from LLM."""
+        debug(f"Sending request to {self.api_type.upper()} API using model: {self.model}")
         
         # 增强系统提示，确保更好的回复质量
-        english_messages = self.messages.copy()
-        if len(english_messages) > 0 and english_messages[0]["role"] == "system":
-            english_messages[0]["content"] += SYSTEM_PROMPT
+        chat_history = self.messages.copy()
+        if len(chat_history) > 0 and chat_history[0]["role"] == "system":
+            # 检查最后一条用户消息的语言
+            user_messages = [m for m in chat_history if m["role"] == "user"]
+            if user_messages:
+                last_user_message = user_messages[-1]["content"]
+                language = self._detect_language(last_user_message)
+                if language == 'chinese':
+                    chat_history[0]["content"] += "\n请用中文回复这个问题。"
         
-        english_response = self._make_api_request(english_messages)
+        llm_response = self._make_api_request(chat_history)
         
-        if not english_response:
+        if not llm_response:
             return self._get_fallback_response("api_error")
         
-        english_content = english_response.get("content", "")
+        # 返回提取的提取文本内容
+        return llm_response.get("content", "")
         
-        if not english_content:
-            debug("Empty English response from LLM")
-            return self._get_fallback_response("empty_response")
+    def _get_translated_message(self, input_message: str, source_language: str = 'english') -> str:
+        """获取翻译后的消息。
         
-        # Clean up the English response for TTS (preserve punctuation)
-        english_content = self._clean_response(english_content)
+        Args:
+            input_message: 需要翻译的消息
+            source_language: 源语言，'english', 'chinese', 或 'other'
+            
+        Returns:
+            翻译后的文本
+        """
+        # 检查输入是否为空
+        if not input_message or input_message.strip() == "":
+            error("Empty input message for translation")
+            if source_language == 'english':
+                return "抱歉，无法处理空的输入消息。"
+            else:
+                return "Sorry, cannot process empty input message."
         
-        return english_content
-        
-    def _get_chinese_translation(self, english_content: str) -> str:
-        """Get a Chinese translation from LLM."""
-        # 准备更强化的翻译提示
-        translation_prompt = self._create_translation_prompt(english_content)
+        # 准备翻译提示
+        translation_prompt = self._create_translation_prompt(input_message, source_language)
         
         translation_messages = [
             {
                 "role": "system",
-                "content": """You are a professional translator specialized in English to Chinese translation.
-                Follow instructions precisely and only output the requested translation.
-                Maintain the same tone, style, and paragraph structure as the original."""
+                "content": """
+                        You are a professional translator with expertise in language translation.
+                        Adhere strictly to the instructions and provide only the requested translation.
+                        Ensure that the tone, style, and paragraph structure of the original text are preserved in the translation.
+                        When translating, avoid literal word-for-word translations. Instead, focus on conveying the intended meaning 
+                        naturally and fluently in the target language, ensuring clarity and readability for the audience.
+                        """
             },
             {
                 "role": "user",
@@ -204,7 +278,7 @@ class LLMService:
             }
         ]
         
-        debug("Sending translation request to Ollama API")
+        debug(f"Sending translation request for {source_language} text")
         
         translation_response = self._make_api_request(
             translation_messages, 
@@ -212,27 +286,59 @@ class LLMService:
         )
         
         if not translation_response:
-            # 翻译失败，使用备用翻译或报错
-            return self._handle_translation_failure(english_content)
+            # 翻译失败，使用备用方案
+            if source_language == 'english':
+                return "抱歉，翻译服务暂时不可用。以上为英文回复。"
+            else:
+                return "Sorry, translation service is temporarily unavailable. Above is the original response."
         
-        raw_chinese = translation_response.get("content", "")
+        translated_content = translation_response.get("content", "")
+        debug(f"Raw translated content: {translated_content}")
         
-        # 进行更强大的中文翻译提取和清理
-        chinese_content = self._extract_chinese_translation(raw_chinese, english_content)
+        # 检查翻译结果是否为空
+        if not translated_content or translated_content.strip() == "":
+            error("Empty translation result")
+            if source_language == 'english':
+                return "抱歉，翻译结果为空。以上为英文回复。"
+            else:
+                return "Sorry, translation result is empty. Above is the original response."
+                
+        # 如果是英译中，使用_extract_chinese_translation进行清理
+        if source_language == 'english':
+            translated_content = self._extract_chinese_translation(translated_content, input_message)
+        # 如果是中译英或其他语言译英，进行英文文本清理
+        else:
+            translated_content = self._clean_response(translated_content)
+            
+            # 移除可能的翻译前缀
+            prefixes_to_remove = [
+                "English translation:", 
+                "Translation:", 
+                "Here's the English translation:", 
+                "English:"
+            ]
+            
+            for prefix in prefixes_to_remove:
+                if translated_content.startswith(prefix):
+                    translated_content = translated_content[len(prefix):].strip()
         
-        if not chinese_content:
-            debug("Empty Chinese translation from LLM")
-            chinese_content = "抱歉，我无法生成适当的中文回应。您能再试一次吗？"
+        # 再次检查清理后的翻译结果是否为空
+        if not translated_content or translated_content.strip() == "":
+            error("Empty translation result after cleaning")
+            if source_language == 'english':
+                return "抱歉，翻译处理后结果为空。以上为英文回复。"
+            else:
+                return "Sorry, translation result is empty after processing. Above is the original response."
         
-        return chinese_content
-        
+        return translated_content
+
     def _make_api_request(
         self, 
         messages: List[Dict[str, str]], 
         temperature: float = 0.7, 
         timeout: int = 60
     ) -> Optional[Dict[str, Any]]:
-        """Make a request to the Ollama API with error handling and retries.
+        """Make a request to the LLM API with error handling and retries.
         
         Args:
             messages: List of message dictionaries
@@ -248,31 +354,69 @@ class LLMService:
         
         while retry_count <= max_retries:
             try:
-                response = requests.post(
-                    f"{self.api_url}/api/chat",
-                    json={
-                        "model": self.model,
-                        "messages": messages,
-                        "stream": False,
-                        "options": {
+                # Ollama API请求
+                if self.api_type == "ollama":
+                    response = requests.post(
+                        f"{self.api_url}/api/chat",
+                        json={
+                            "model": self.model,
+                            "messages": messages,
+                            "stream": False,
+                            "options": {
+                                "temperature": temperature,
+                                "top_p": 0.9,
+                                "top_k": 40
+                            }
+                        },
+                        timeout=timeout
+                    )
+                    
+                    if response.status_code == 200:
+                        result = response.json()
+                        return result.get("message", {})
+                    else:
+                        error(f"LLM API error (attempt {retry_count+1}/{max_retries+1}): {response.status_code}")
+                        debug(f"Error response: {response.text}")
+                        
+                # DeepSeek API请求
+                elif self.api_type == "deepseek":
+                    # 将消息格式转换为DeepSeek格式
+                    deepseek_messages = self._convert_to_deepseek_format(messages)
+                    
+                    response = requests.post(
+                        f"{self.api_url}/v1/chat/completions",
+                        headers={
+                            "Authorization": f"Bearer {self.api_key}",
+                            "Content-Type": "application/json"
+                        },
+                        json={
+                            "model": self.model,
+                            "messages": deepseek_messages,
                             "temperature": temperature,
                             "top_p": 0.9,
-                            "top_k": 40
-                        }
-                    },
-                    timeout=timeout
-                )
-                
-                if response.status_code == 200:
-                    result = response.json()
-                    return result.get("message", {})
-                else:
-                    error(f"LLM API error (attempt {retry_count+1}/{max_retries+1}): {response.status_code}")
-                    debug(f"Error response: {response.text}")
-                    retry_count += 1
+                            "max_tokens": 2048,
+                            "stream": False
+                        },
+                        timeout=timeout
+                    )
                     
-                    if retry_count <= max_retries:
-                        debug(f"Retrying request... ({retry_count}/{max_retries})")
+                    if response.status_code == 200:
+                        result = response.json()
+                        # 转换DeepSeek返回格式为统一格式
+                        return {
+                            "role": "assistant",
+                            "content": result.get("choices", [{}])[0].get("message", {}).get("content", "")
+                        }
+                    else:
+                        error(f"DeepSeek API error (attempt {retry_count+1}/{max_retries+1}): {response.status_code}")
+                        debug(f"Error response: {response.text}")
+                
+                # 如果请求失败但有重试次数，则进行重试
+                retry_count += 1
+                if retry_count <= max_retries:
+                    debug(f"Retrying request... ({retry_count}/{max_retries})")
+                    # 添加短暂的延迟避免过于频繁请求
+                    time.sleep(1)
                     
             except requests.exceptions.RequestException as e:
                 error(f"Request failed (attempt {retry_count+1}/{max_retries+1}): {e}")
@@ -280,34 +424,81 @@ class LLMService:
                 
                 if retry_count <= max_retries:
                     debug(f"Retrying request... ({retry_count}/{max_retries})")
+                    time.sleep(1)
         
         return None
-            
-    def _create_translation_prompt(self, english_content: str) -> str:
-        """Create a clear translation prompt.
+
+    def _convert_to_deepseek_format(self, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
+        """将通用消息格式转换为DeepSeek API所需的格式。
         
         Args:
-            english_content: The English text to translate
+            messages: 通用格式的消息列表
             
         Returns:
-            A formatted translation prompt
+            DeepSeek格式的消息列表
         """
-        return f"""
-                Translate the following English text to Chinese. 
+        # DeepSeek API使用的role格式与我们的基本一致，但可能有细微差别
+        # 此函数确保兼容性
+        deepseek_messages = []
+        
+        for msg in messages:
+            role = msg["role"]
+            # DeepSeek使用user/assistant/system角色
+            if role not in ["user", "assistant", "system"]:
+                # 如果有其他角色，默认转为user
+                role = "user"
+                
+            deepseek_messages.append({
+                "role": role,
+                "content": msg["content"]
+            })
+            
+        return deepseek_messages
 
-                IMPORTANT INSTRUCTIONS:
-                1. Provide ONLY the Chinese translation
-                2. DO NOT include any English text
-                3. DO NOT add additional explanations or notes
-                4. DO NOT include quotation marks around the translation
-                5. Maintain the exact same paragraph breaks as the original
-                6. Translate in a natural, fluent style that doesn't sound machine-translated
+    def _create_translation_prompt(self, content: str, source_language: str = 'english') -> str:
+        """创建清晰的翻译提示。
+        
+        Args:
+            content: 要翻译的文本
+            source_language: 源语言，'english', 'chinese', 或 'other'
+            
+        Returns:
+            格式化的翻译提示
+        """
+        if source_language == 'english':
+            return f"""
+                    Translate the following English text to Chinese. 
 
-                English text to translate:
-                {english_content}
+                    IMPORTANT INSTRUCTIONS:
+                    1. Provide ONLY the Chinese translation
+                    2. DO NOT include any English text
+                    3. DO NOT add additional explanations or notes
+                    4. DO NOT include quotation marks around the translation
+                    5. Maintain the exact same paragraph breaks as the original
+                    6. Translate in a natural, fluent style that doesn't sound machine-translated
 
-                Chinese translation:
-                """
+                    Text to translate:
+                    {content}
+
+                    Chinese translation:
+                    """
+        else:
+            return f"""
+                    Translate the following text to English. 
+
+                    IMPORTANT INSTRUCTIONS:
+                    1. Provide ONLY the English translation
+                    2. DO NOT include any text in the original language
+                    3. DO NOT add additional explanations or notes
+                    4. DO NOT include quotation marks around the translation
+                    5. Maintain the exact same paragraph breaks as the original
+                    6. Translate in a natural, fluent style that doesn't sound machine-translated
+
+                    Text to translate:
+                    {content}
+
+                    English translation:
+                    """
 
     def _extract_chinese_translation(self, raw_translation: str, english_content: str) -> str:
         """Extract and clean up the Chinese translation, handling various format issues.
@@ -405,50 +596,58 @@ class LLMService:
         Returns:
             A dictionary with fallback responses
         """
+        # 获取当前使用的API类型和模型
+        api_info = f"{self.api_type.upper()}({self.model})"
+        
         responses = {
             "empty_response": {
-                "english": "I'm sorry, I couldn't generate a proper response. Could you try asking again?",
-                "chinese": "抱歉，我无法生成适当的回应。您能再试一次吗？"
+                "original_text": "I'm sorry, I couldn't generate a proper response. Could you try asking again?",
+                "translated_text": "抱歉，我无法生成适当的回应。您能再试一次吗？"
             },
             "api_error": {
-                "english": f"I'm sorry, there was an error connecting to my language model ({self.model}). Please try again later.",
-                "chinese": f"抱歉，连接到我的语言模型 ({self.model}) 时出现错误。请稍后再试。"
+                "original_text": f"I'm sorry, there was an error connecting to my language model {api_info}. Please try again later.",
+                "translated_text": f"抱歉，连接到我的语言模型 {api_info} 时出现错误。请稍后再试。"
             },
             "exception": {
-                "english": "I'm sorry, I encountered an error while processing your request. Please try again.",
-                "chinese": "抱歉，处理您的请求时遇到错误。请再试一次。"
+                "original_text": "I'm sorry, I encountered an error while processing your request. Please try again.",
+                "translated_text": "抱歉，处理您的请求时遇到错误。请再试一次。"
             },
             "translation_error": {
-                "english": kwargs.get("english_content", "Sorry, there was an error with the translation."),
-                "chinese": "抱歉，翻译过程中出现错误。"
+                "original_text": kwargs.get("original_text", "Sorry, there was an error with the translation."),
+                "translated_text": "抱歉，翻译过程中出现错误。"
             }
         }
         
         response = responses.get(error_type, responses["exception"])
         
         return {
-            "english": response["english"],
-            "chinese": response["chinese"]
+            "original_text": response["original_text"],
+            "translated_text": response["translated_text"]
         }
         
-    def _handle_translation_failure(self, english_content: str) -> Dict[str, str]:
-        """Handle the case when translation fails."""
-        debug("Translation failed, using fallback Chinese response")
+    def _handle_translation_failure(self, input_message: str) -> Dict[str, str]:
+        """处理翻译失败的情况。
         
-        return {
-            "english": english_content,
-            "chinese": "抱歉，翻译服务暂时不可用。以上为英文回复。"
-        }
+        Args:
+            input_message: 原始输入消息
+            
+        Returns:
+            备用的翻译或错误消息
+        """
+        debug("Translation failed, using fallback response")
         
-    # def reset_conversation(self) -> None:
-    #     """Reset the conversation history, keeping only the system message."""
-    #     system_messages = [m for m in self.messages if m["role"] == "system"]
-    #     self.messages = system_messages if system_messages else [
-    #         {
-    #             "role": "system",
-    #             "content": "You are a helpful, concise assistant. Provide clear and accurate responses."
-    #         }
-    #     ]
+        language = self._detect_language(input_message)
+        
+        if language == 'english':
+            return {
+                "original_text": input_message,
+                "translated_text": "抱歉，翻译服务暂时不可用。以上为英文回复。"
+            }
+        else:
+            return {
+                "original_text": input_message,
+                "translated_text": "Sorry, translation service is temporarily unavailable. Above is the original response."
+            }
         
     def set_messages(self, messages: List[Dict[str, str]]) -> None:
         """Set the conversation history directly.
@@ -483,11 +682,92 @@ class LLMService:
         
         self.messages = valid_messages
         debug(f"Set conversation history with {len(self.messages)} messages")
+
+    def set_api_type(self, api_type: str, model: str = None) -> None:
+        """设置API类型和模型。
         
-    # def get_messages(self) -> List[Dict[str, str]]:
-    #     """Get the current conversation history.
+        Args:
+            api_type: API类型，可以是"ollama"或"deepseek"
+            model: 要使用的模型名称（可选）
+        """
+        if api_type.lower() not in ["ollama", "deepseek"]:
+            error(f"不支持的API类型: {api_type}")
+            return
+            
+        self.api_type = api_type.lower()
         
-    #     Returns:
-    #         A list of message dictionaries
-    #     """
-    #     return self.messages.copy()
+        if self.api_type == "ollama":
+            self.api_url = settings.OLLAMA_API_URL
+            self.model = model or settings.OLLAMA_MODEL
+            # 更新可用模型列表
+            self.available_models = self._get_available_models()
+            if self.model not in self.available_models and self.available_models:
+                info(f"Model '{self.model}' not found. Using '{self.available_models[0]}' instead.")
+                self.model = self.available_models[0]
+        elif self.api_type == "deepseek":
+            self.api_url = settings.DEEPSEEK_BASE_URL
+            self.api_key = settings.DEEPSEEK_API_KEY
+            self.model = model or settings.DEEPSEEK_MODEL
+            self.available_models = ["deepseek-chat", "deepseek-coder"]
+            
+        debug(f"API type set to {self.api_type} with model {self.model}")
+
+    async def generate_response(self, user_input: str) -> Optional[Dict[str, str]]:
+        """异步包装器，用于获取LLM响应。
+        
+        这个方法只是简单地调用同步的get_response方法，但提供异步接口以便于与其他异步代码集成。
+        
+        Args:
+            user_input: 用户输入文本
+            
+        Returns:
+            包含原始和翻译文本的字典，或在失败时返回None
+        """
+        # 在真正的异步实现中，我们可能会在这里使用线程池执行器来避免阻塞
+        # 但目前我们只是简单地调用同步方法
+        return self.get_response(user_input)
+
+    def get_status(self) -> Dict[str, Any]:
+        """获取LLM服务的当前状态和配置信息。
+        
+        Returns:
+            包含LLM服务状态信息的字典
+        """
+        status = {
+            "api_type": self.api_type,
+            "model": self.model,
+            "api_url": self.api_url,
+            "available_models": self.available_models,
+            "message_history_length": len(self.messages)
+        }
+        
+        # 添加API特定的信息
+        if self.api_type == "deepseek":
+            # 保护API密钥，只显示前8位和后4位
+            if hasattr(self, "api_key") and self.api_key:
+                masked_key = f"{self.api_key[:8]}...{self.api_key[-4:]}" if len(self.api_key) > 12 else "***masked***"
+                status["api_key_status"] = f"Configured ({masked_key})"
+            else:
+                status["api_key_status"] = "Not configured"
+        
+        # 测试API连接
+        api_status = "Unknown"
+        try:
+            if self.api_type == "ollama":
+                # 尝试获取模型列表作为连接测试
+                response = requests.get(f"{self.api_url}/api/tags", timeout=3)
+                api_status = "Connected" if response.status_code == 200 else f"Error ({response.status_code})"
+            elif self.api_type == "deepseek":
+                # 使用简单模型查询测试连接
+                response = requests.get(
+                    f"{self.api_url}/v1/models",
+                    headers={"Authorization": f"Bearer {self.api_key}"},
+                    timeout=3
+                )
+                api_status = "Connected" if response.status_code == 200 else f"Error ({response.status_code})"
+        except Exception as e:
+            api_status = f"Connection failed: {str(e)}"
+            
+        status["connection_status"] = api_status
+        
+        return status

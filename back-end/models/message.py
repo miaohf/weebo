@@ -11,10 +11,7 @@ class Message(Base):
     message_id = Column(String(255), nullable=True)
     role = Column(String(50), nullable=False)  # user 或 assistant
     content = Column(Text, nullable=True)
-    
-    # 使用JSON类型存储内容的备选方案
-    content_english = Column(Text, nullable=True)
-    content_chinese = Column(Text, nullable=True)
+    translated_content = Column(Text, nullable=True)
     
     # 音频相关字段
     audio_path = Column(String(255), nullable=True)

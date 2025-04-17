@@ -371,8 +371,8 @@ const useChat = () => {
         id,
         role,
         content: typeof content === 'string' ? content : { 
-          english: content.english || '', 
-          chinese: content.chinese || '',
+          original_text: content.original_text || '', 
+          translated_text: content.translated_text || '',
           audio: content.audio || null
         },
         timestamp: new Date()
@@ -387,7 +387,7 @@ const useChat = () => {
         // 比较内容是否基本相同
         if (
           (typeof lastContent === 'object' && typeof newContent === 'object' &&
-           lastContent.english === newContent.english) ||
+           lastContent.original_text === newContent.original_text) ||
           (typeof lastContent === 'string' && lastContent === newContent)
         ) {
           console.warn('检测到内容相同的消息，跳过添加');
@@ -411,7 +411,7 @@ const useChat = () => {
   // 修改 handleAudioData 函数
   const handleAudioData = useCallback(async (messageData) => {
     try {
-      const { message_id, segment_index, total_segments, audio_data, sample_rate, english, chinese } = messageData;
+      const { message_id, segment_index, total_segments, audio_data, sample_rate, original_text, translated_text } = messageData;
       console.log(`处理音频段落 ${segment_index}/${total_segments} for ${message_id}`);
       
       // 更新UI状态
@@ -436,8 +436,8 @@ const useChat = () => {
         audio_data,
         sample_rate,
         total_segments,
-        english,
-        chinese
+        original_text,
+        translated_text
       });
 
       // 仅在接收第一个分段且message_id不在正在播放的队列中时触发播放
@@ -752,8 +752,8 @@ const useChat = () => {
         messages: messages.map(msg => ({
           role: msg.role,
           content: typeof msg.content === 'string' ? msg.content : {
-            english: msg.content.english || '',
-            chinese: msg.content.chinese || ''
+            english: msg.content.original_text || '',
+            chinese: msg.content.translated_text || ''
           },
           timestamp: msg.timestamp
         }))

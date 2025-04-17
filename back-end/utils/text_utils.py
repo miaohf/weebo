@@ -2,6 +2,35 @@
 import re
 from typing import List
 
+def split_text(text: str, max_length: int = 250) -> List[str]:
+    """将文本分割为合适长度的段落，用于TTS处理
+    
+    Args:
+        text: 要分割的文本
+        max_length: 每个段落的最大长度
+        
+    Returns:
+        分割后的文本段落列表
+    """
+    return split_text_into_segments(text, max_length)
+
+def clean_text(text: str) -> str:
+    """清理文本，移除特殊字符和格式化问题
+    
+    Args:
+        text: 要清理的文本
+        
+    Returns:
+        清理后的文本
+    """
+    # 移除多余空白字符
+    text = re.sub(r'\s+', ' ', text)
+    # 修复标点符号间距
+    text = re.sub(r'\s+([,.!?;:])', r'\1', text)
+    # 去除首尾空白
+    text = text.strip()
+    return text
+
 def split_text_into_segments(text: str, max_length: int = 250) -> List[str]:
     """将文本分割为合适长度的段落，用于TTS处理"""
     # 空文本或短文本直接返回

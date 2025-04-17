@@ -29,6 +29,14 @@ class UnifiedResponse(BaseModel):
     images: Optional[List[ImageData]] = None
     status: str = "success"
 
+class ChatResponse(BaseModel):
+    """聊天接口响应模型"""
+    message_id: str
+    reply: str
+    audio_data: Optional[str] = None  # base64编码的音频(如果有)
+    session_id: Optional[str] = None
+    status: str = "success"
+
 class StreamTextResponse(BaseModel):
     """流式文本响应"""
     type: str = "text"

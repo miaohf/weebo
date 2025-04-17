@@ -60,8 +60,8 @@ const Message = ({ message, showChinese, onPlayAudio, onReplayAudio, isPlaying }
       if (showChinese && role === 'assistant') {
         displayContent = (
           <>
-            <p className="message-english">
-              {content.english || ''}
+            <p className="message-orginal">
+              {content.original_text || ''}
               {isAssistant && status !== 'loading' && isAudioComplete && (
                 <button 
                   className={`replay-audio-btn ${isLoading ? 'loading' : ''} ${isPlaying ? 'playing' : ''}`}
@@ -73,15 +73,15 @@ const Message = ({ message, showChinese, onPlayAudio, onReplayAudio, isPlaying }
                 </button>
               )}
             </p>
-            {content.chinese && content.chinese !== content.english && (
-              <p className="message-chinese">{content.chinese}</p>
+            {content.translated_text && content.translated_text !== content.original_text && (
+              <p className="message-translated">{content.translated_text}</p>
             )}
           </>
         );
       } else {
         displayContent = (
           <p>
-            {content.english || ''}
+            {content.original_text || ''}
             {isAssistant && status !== 'loading' && isAudioComplete && (
               <button 
                 className={`replay-audio-btn ${isLoading ? 'loading' : ''} ${isPlaying ? 'playing' : ''}`}

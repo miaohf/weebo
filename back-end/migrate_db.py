@@ -3,6 +3,7 @@ import json
 import os
 from models.database_models import init_db, Message, AudioSegment, MergedAudio
 from sqlalchemy.orm import Session
+from core.config import settings
 
 def migrate_old_to_new(old_db_path, new_db_path):
     """将旧数据库迁移到新的ORM模型"""
@@ -96,21 +97,26 @@ def migrate_old_to_new(old_db_path, new_db_path):
         conn.close()
 
 if __name__ == "__main__":
-    # 备份旧数据库
-    old_db = "data/messages.db"
-    backup_db = "data/messages_backup.db"
+    # 使用配置的数据库路径
+    db_path = settings.DATABASE_PATH
     
-    if os.path.exists(old_db):
+    # 确保数据目录存在
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    
+    # 备份旧数据库
+    backup_db = f"{db_path}.backup"
+    
+    if os.path.exists(db_path):
         import shutil
-        shutil.copy2(old_db, backup_db)
+        shutil.copy2(db_path, backup_db)
         print(f"旧数据库已备份到: {backup_db}")
         
         # 迁移数据
-        migrate_old_to_new(old_db, old_db + ".new")
+        migrate_old_to_new(db_path, f"{db_path}.new")
         
         # 完成后重命名
-        os.rename(old_db, old_db + ".old")
-        os.rename(old_db + ".new", old_db)
+        os.rename(db_path, f"{db_path}.old")
+        os.rename(f"{db_path}.new", db_path)
         print("迁移完成，新数据库已就绪")
     else:
-        print(f"旧数据库不存在: {old_db}") 
+        print(f"旧数据库不存在: {db_path}") 

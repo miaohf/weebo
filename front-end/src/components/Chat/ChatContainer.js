@@ -14,13 +14,13 @@ const ChatContainer = ({
   selectedSpeaker
 }) => {
   // 添加调试日志
-  console.log("ChatContainer received props:", { 
-    hasMessages: Array.isArray(messages), 
-    messageCount: Array.isArray(messages) ? messages.length : 0,
-    onSendMessageType: typeof onSendMessage,
-    isLoading,
-    showChinese
-  });
+  // console.log("ChatContainer received props:", { 
+  //   hasMessages: Array.isArray(messages), 
+  //   messageCount: Array.isArray(messages) ? messages.length : 0,
+  //   onSendMessageType: typeof onSendMessage,
+  //   isLoading,
+  //   showChinese
+  // });
   
   // 加一个包装函数确保参数传递正确
   const handleSendMessage = (message, files, messageType, speaker, streamAudio = true) => {

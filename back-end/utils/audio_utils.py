@@ -6,6 +6,37 @@ import os
 from datetime import datetime
 from utils.logging_utils import debug, error
 
+def convert_audio_format(audio_data, input_format, output_format, sample_rate=24000):
+    """将音频数据从一种格式转换为另一种格式
+    
+    Args:
+        audio_data: 音频数据（字节）
+        input_format: 输入格式 (wav, mp3, webm等)
+        output_format: 输出格式 (wav, mp3等)
+        sample_rate: 采样率
+        
+    Returns:
+        转换后的音频数据（字节）
+    """
+    try:
+        # 如果格式相同，直接返回
+        if input_format == output_format:
+            return audio_data
+            
+        # 使用soundfile读取音频
+        data, sr = sf.read(io.BytesIO(audio_data))
+        
+        # 输出到内存buffer
+        output_buffer = io.BytesIO()
+        sf.write(output_buffer, data, sample_rate, format=output_format)
+        
+        # 返回字节数据
+        output_buffer.seek(0)
+        return output_buffer.read()
+    except Exception as e:
+        error(f"音频格式转换错误: {e}")
+        return audio_data
+
 def save_audio_to_file(audio_data, sample_rate, directory="recordings"):
     """Save audio data to a file."""
     try:
@@ -116,6 +147,50 @@ def detect_silence(audio_data, threshold=0.01, min_silence_duration=0.3, sample_
     except Exception as e:
         error(f"Silence detection error: {e}")
         return []
+
+def trim_silence(audio_data, threshold=0.01, padding_ms=200, sample_rate=24000):
+    """修剪音频开头和结尾的静音部分
+    
+    Args:
+        audio_data: 音频数据
+        threshold: 静音检测阈值
+        padding_ms: 保留的静音填充（毫秒）
+        sample_rate: 采样率
+        
+    Returns:
+        修剪后的音频数据
+    """
+    try:
+        if len(audio_data) == 0:
+            return audio_data
+            
+        # 转换为单声道（如果是立体声）
+        if len(audio_data.shape) > 1 and audio_data.shape[1] > 1:
+            audio_data = np.mean(audio_data, axis=1)
+            
+        # 计算能量
+        energy = np.abs(audio_data)
+        
+        # 寻找非静音样本
+        mask = energy > threshold
+        
+        if not np.any(mask):
+            # 如果全是静音，返回一小段
+            return np.zeros(int(0.1 * sample_rate))
+            
+        # 找到第一个和最后一个非静音样本
+        start = np.where(mask)[0][0]
+        end = np.where(mask)[0][-1]
+        
+        # 添加填充
+        padding = int(padding_ms * sample_rate / 1000)
+        start = max(0, start - padding)
+        end = min(len(audio_data), end + padding)
+        
+        return audio_data[start:end]
+    except Exception as e:
+        error(f"修剪静音错误: {e}")
+        return audio_data
 
 def split_audio_at_silence(audio_data, sample_rate=24000):
     """Split audio at silence points."""

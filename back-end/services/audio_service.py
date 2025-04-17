@@ -11,7 +11,7 @@ from datetime import datetime
 import os
 import traceback
 from utils.logging_utils import debug, info, error
-import config
+from core.config import settings
 import time  # 添加time模块导入
 
 class AudioService:
@@ -46,7 +46,7 @@ class AudioService:
                         debug(f"Playing audio: shape={audio_array.shape}, sr={samplerate}")
                         
                         # Always use the actual sample rate from the audio file
-                        # instead of assuming config.SAMPLE_RATE
+                        # instead of assuming settings.SAMPLE_RATE
                         with sd.OutputStream(
                             samplerate=samplerate,
                             channels=1,
@@ -96,7 +96,7 @@ class AudioService:
             
             # Start audio stream
             with sd.InputStream(
-                samplerate=config.SAMPLE_RATE,
+                samplerate=settings.SAMPLE_RATE,
                 channels=1,
                 callback=audio_callback,
                 blocksize=4096,
@@ -114,7 +114,7 @@ class AudioService:
                         audio_level = np.abs(audio_chunk).mean()
                         
                         # Detect speech
-                        if audio_level > config.SILENCE_THRESHOLD:
+                        if audio_level > settings.SILENCE_THRESHOLD:
                             if not is_speaking:
                                 is_speaking = True
                                 speech_start = time.time()
@@ -128,8 +128,8 @@ class AudioService:
                                 audio_buffer.append(audio_chunk)
                                 
                                 # Check if silence duration exceeds threshold
-                                if time.time() - silence_start > config.SILENCE_DURATION:
-                                    debug(f"Silence detected for {config.SILENCE_DURATION}s, stopping recording")
+                                if time.time() - silence_start > settings.SILENCE_DURATION:
+                                    debug(f"Silence detected for {settings.SILENCE_DURATION}s, stopping recording")
                                     break
                             else:
                                 # Keep a small buffer of background noise
@@ -158,21 +158,24 @@ class AudioService:
             audio_data = audio_data.flatten()  # Ensure 1D array
             
             # Check if audio is too short
-            if len(audio_data) < config.MIN_VALID_AUDIO_LENGTH * config.SAMPLE_RATE:
-                debug(f"Audio too short: {len(audio_data) / config.SAMPLE_RATE:.2f}s")
+            if len(audio_data) < settings.MIN_VALID_AUDIO_LENGTH * settings.SAMPLE_RATE:
+                debug(f"Audio too short: {len(audio_data) / settings.SAMPLE_RATE:.2f}s")
                 return None
             
-            debug(f"Buffer size: {len(audio_data)}, Duration: {len(audio_data) / config.SAMPLE_RATE:.2f}s")
+            debug(f"Buffer size: {len(audio_data)}, Duration: {len(audio_data) / settings.SAMPLE_RATE:.2f}s")
             
             # Return audio data and sample rate as a tuple
-            return (audio_data, config.SAMPLE_RATE)
+            return (audio_data, settings.SAMPLE_RATE)
             
         except Exception as e:
             error(f"Recording error: {e}")
             return None
     
-    def play_audio(self, audio_data, samplerate=config.SAMPLE_RATE):
+    def play_audio(self, audio_data, samplerate=None):
         """Add audio to the playback queue."""
+        if samplerate is None:
+            samplerate = settings.SAMPLE_RATE
+            
         if audio_data is not None:
             # Ensure audio_data is a numpy array
             if isinstance(audio_data, tuple) and len(audio_data) == 2:
@@ -191,13 +194,13 @@ class AudioService:
                     error(f"Status: {status}")
                 
                 level = np.abs(indata).mean()
-                if level > config.SILENCE_THRESHOLD:
+                if level > settings.SILENCE_THRESHOLD:
                     self.interrupt_queue.put(True)
                     raise sd.CallbackStop()
             
             with sd.InputStream(
                 channels=1,
-                samplerate=config.SAMPLE_RATE,
+                samplerate=settings.SAMPLE_RATE,
                 callback=callback,
                 dtype=np.float32
             ):
@@ -217,7 +220,7 @@ class AudioService:
             interrupt_thread.start()
             
             with sd.OutputStream(
-                samplerate=config.SAMPLE_RATE,
+                samplerate=settings.SAMPLE_RATE,
                 channels=1,
                 dtype=np.float32,
                 callback=None
@@ -273,8 +276,8 @@ class AudioService:
             
             # Record ambient noise
             noise_data = sd.rec(
-                int(duration * config.SAMPLE_RATE),
-                samplerate=config.SAMPLE_RATE,
+                int(duration * settings.SAMPLE_RATE),
+                samplerate=settings.SAMPLE_RATE,
                 channels=1,
                 dtype=np.float32
             )

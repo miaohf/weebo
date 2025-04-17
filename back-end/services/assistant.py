@@ -14,7 +14,7 @@ from services.database_service import DatabaseService
 from models.stt_model import SpeechToTextModel
 from models.tts_model import TextToSpeechModel
 from utils.logging_utils import debug, info, error
-import config
+from core.config import settings
 import json
 
 class Assistant:
@@ -27,8 +27,14 @@ class Assistant:
         
         # Initialize services
         self.audio_service = AudioService(self.shutdown_event)
-        self.llm_service = LLMService()
-        self.db_service = DatabaseService("data/messages.db")
+        
+        # 根据配置初始化LLM服务
+        llm_mode = settings.LLM_SERVICE_MODE.lower()
+        info(f"初始化LLM服务，使用模式: {llm_mode}")
+        self.llm_service = LLMService(api_type=llm_mode)
+        
+        # 使用配置的数据库路径
+        self.db_service = DatabaseService(settings.DATABASE_PATH)
         self.stt_model = SpeechToTextModel()
         self.tts_model = TextToSpeechModel()
         
@@ -115,11 +121,13 @@ class Assistant:
                 
             # 按顺序读取所有分段音频
             audio_segments = []
+            segment_file_paths = []
             for seg in sorted(audio_paths, key=lambda x: x["segment_index"]):
                 file_path = os.path.join(storage_dir, seg["path"])
                 if os.path.exists(file_path):
                     data, sr = sf.read(file_path)
                     audio_segments.append(data)
+                    segment_file_paths.append(file_path)
             
             # 合并并保存
             if audio_segments:
@@ -162,6 +170,15 @@ class Assistant:
                     info(f"已保存合并音频记录: {merged_audio}")
                 else:
                     error(f"保存合并音频记录失败")
+                
+                # 合并完成后删除原始分段音频文件
+                try:
+                    for file_path in segment_file_paths:
+                        if os.path.exists(file_path):
+                            os.remove(file_path)
+                            info(f"已删除分段音频文件: {file_path}")
+                except Exception as e:
+                    error(f"删除分段音频文件失败: {str(e)}")
                 
         except Exception as e:
             error(f"合并音频失败: {str(e)}")

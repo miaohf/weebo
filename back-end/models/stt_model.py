@@ -1,91 +1,84 @@
 """Speech-to-text model service."""
+import os
+import time
+import tempfile
+import numpy as np
 import requests
 import io
-import numpy as np
+import wave
+import json
 import soundfile as sf
 from utils.logging_utils import debug, info, error
-import config
-import json
+from core.config import settings
 
 class SpeechToTextModel:
     """Service for speech-to-text conversion."""
     
-    def __init__(self, api_url=config.WHISPER_API_URL):
-        """Initialize STT model."""
-        self.api_url = api_url
-        self.language = "en"  # Default language
-        self.previous_transcripts = []  # Store recent transcripts for context
+    def __init__(self, api_url=None):
+        """Initialize the STT model."""
+        self.stt_mode = settings.STT_SERVICE_MODE
+        self.api_url = api_url or settings.WHISPER_API_URL
+        self.sample_rate = settings.WHISPER_SAMPLE_RATE
+        
+        info(f"初始化STT服务，使用模式: {self.stt_mode}，API地址: {self.api_url}")
     
     def transcribe(self, audio_data):
         """Transcribe audio data to text."""
+        if self.stt_mode == "api":
+            return self._transcribe_with_api(audio_data)
+        else:
+            error(f"未支持的STT模式: {self.stt_mode}")
+            return self._transcribe_with_api(audio_data)  # 默认回退到API模式
+    
+    def _transcribe_with_api(self, audio_data):
+        """Transcribe audio using API."""
         try:
-            # 确保输入是numpy数组
-            if not isinstance(audio_data, np.ndarray):
-                raise ValueError("Input must be a numpy array")
-                
-            # 确保数据类型为float32
+            # 确保音频为float32类型、单声道
             if audio_data.dtype != np.float32:
                 audio_data = audio_data.astype(np.float32)
             
-            # Normalize audio
-            if np.max(np.abs(audio_data)) > 0:
-                audio_data = audio_data / np.max(np.abs(audio_data))
+            # 如果是多声道，转为单声道
+            if len(audio_data.shape) > 1 and audio_data.shape[1] > 1:
+                audio_data = np.mean(audio_data, axis=1)
             
-            # Save to WAV file in memory
-            buffer = io.BytesIO()
-            sf.write(buffer, audio_data, config.WHISPER_SAMPLE_RATE, format='WAV')
-            buffer.seek(0)
+            # 将音频保存为WAV文件
+            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_file:
+                temp_filename = temp_file.name
+                sf.write(temp_filename, audio_data, self.sample_rate)
             
-            # Prepare API request with additional parameters
-            files = {'file': ('audio.wav', buffer, 'audio/wav')}
+            debug(f"音频保存为临时文件: {temp_filename}")
             
-            # Add context from previous transcripts to improve accuracy
-            context = " ".join(self.previous_transcripts[-3:]) if self.previous_transcripts else ""
+            # 发送到API
+            with open(temp_filename, 'rb') as audio_file:
+                start_time = time.time()
+                response = requests.post(
+                    self.api_url,
+                    files={'file': audio_file},
+                    timeout=30
+                )
+                elapsed = time.time() - start_time
+                debug(f"STT API响应时间: {elapsed:.2f}秒")
             
-            data = {
-                'language': self.language,
-                'task': 'transcribe',
-                'initial_prompt': context,  # Use previous transcripts as context
-                'word_timestamps': 'false',
-                'temperature': '0.0',  # Lower temperature for more accurate transcription
-                'best_of': '5',        # Consider multiple samples
-                'beam_size': '5',      # Use beam search for better results
-                'patience': '1.0',     # Beam search patience
-                'suppress_tokens': '-1',
-                'condition_on_previous_text': 'true',
-                'temperature_increment_on_fallback': '0.2',
-                'compression_ratio_threshold': '2.4',
-                'logprob_threshold': '-1.0',
-                'no_speech_threshold': '0.6'
-            }
+            # 删除临时文件
+            try:
+                os.unlink(temp_filename)
+            except:
+                pass
             
-            debug(f"Sending audio to Whisper API with context length: {len(context)}")
-            response = requests.post(self.api_url, files=files, data=data)
-            
-            debug(f"Whisper API response status: {response.status_code}")
             if response.status_code == 200:
                 result = response.json()
-                transcript = result.get('text', '').strip()
-                
-                # Post-process transcript
-                transcript = self._post_process_transcript(transcript)
-                
-                debug(f"Transcription received: {transcript}")
-                
-                # Store transcript for future context if it's not empty
-                if transcript and len(transcript) > 5:
-                    self.previous_transcripts.append(transcript)
-                    # Keep only the last 5 transcripts
-                    self.previous_transcripts = self.previous_transcripts[-5:]
-                
-                return transcript
+                text = result.get('text', '').strip()
+                debug(f"STT结果: {text}")
+                return text
             else:
-                error(f"Whisper API error: {response.status_code}")
-                debug(f"API error response: {response.text}")
-                return None
+                error(f"STT API请求失败: {response.status_code}")
+                debug(f"错误响应: {response.text}")
+                return ""
         except Exception as e:
-            error(f"Transcription error: {e}")
-            return None
+            error(f"STT转录失败: {e}")
+            import traceback
+            debug(f"异常详情: {traceback.format_exc()}")
+            return ""
     
     def _post_process_transcript(self, transcript):
         """Post-process the transcript to improve quality."""

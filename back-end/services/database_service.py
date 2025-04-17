@@ -10,17 +10,23 @@ from datetime import datetime
 import logging
 import uuid
 import traceback
+from utils.logging_utils import debug, info, error
+from core.config import settings
 
 logger = logging.getLogger(__name__)
 
 class DatabaseService:
     """数据库服务，使用SQLAlchemy ORM处理数据库操作"""
     
-    def __init__(self, db_path="data/messages.db"):
+    def __init__(self, db_path=None):
         """初始化数据库服务"""
-        self.db_path = db_path
-        self.engine, self.SessionLocal = init_db(db_path)
-        logging.info(f"数据库服务初始化: {db_path}")
+        self.db_path = db_path or settings.DATABASE_PATH
+        
+        # 确保数据目录存在
+        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        
+        self.engine, self.SessionLocal = init_db(self.db_path)
+        info(f"数据库服务初始化: {self.db_path}")
         
     def get_db(self):
         """获取数据库会话"""
@@ -30,7 +36,7 @@ class DatabaseService:
         finally:
             db.close()
     
-    def save_message(self, role, content):
+    def save_message(self, role, content=None, translated_content=None):
         """保存消息"""
         try:
             message_id = str(uuid.uuid4())
@@ -42,6 +48,7 @@ class DatabaseService:
                 role=role,
                 message_id=message_id,
                 content=json.dumps(content) if not isinstance(content, str) else content,
+                translated_content=json.dumps(translated_content) if not isinstance(translated_content, str) else translated_content,
                 created_at=datetime.now()
             )
             
@@ -51,11 +58,11 @@ class DatabaseService:
                 db.commit()
                 db.refresh(message)
             
-            logging.debug(f"已保存消息: {key}")
+            debug(f"已保存消息: {key}")
             return message_id
         except Exception as e:
-            logging.error(f"保存消息失败: {e}")
-            logging.error(traceback.format_exc())
+            error(f"保存消息失败: {e}")
+            error(traceback.format_exc())
             return None
     
     def save_message_with_audio(self, role, content, message_id, audio_paths=None):
@@ -96,12 +103,12 @@ class DatabaseService:
                 
                 db.commit()
                 
-            logging.debug(f"已保存消息(带音频路径): {key}")
+            debug(f"已保存消息(带音频路径): {key}")
             return True
                 
         except Exception as e:
-            logging.error(f"保存消息(带音频路径)失败: {e}")
-            logging.error(traceback.format_exc())
+            error(f"保存消息(带音频路径)失败: {e}")
+            error(traceback.format_exc())
             return False
     
     def update_message_audio(self, message_id, audio_info):
@@ -116,30 +123,30 @@ class DatabaseService:
                     message = db.query(Message).filter(Message.id == int(message_id)).first()
                 
                 if not message:
-                    logging.error(f"未找到消息: {message_id}")
+                    error(f"未找到消息: {message_id}")
                     return False
                 
                 # 记录调试信息
-                logging.info(f"更新消息音频: {message_id}, 音频信息: {str(audio_info)[:100]}...")
+                info(f"更新消息音频: {message_id}, 音频信息: {str(audio_info)[:100]}...")
                 
                 # 更新音频信息
                 if isinstance(audio_info, str):
                     # 如果只是路径字符串
                     message.audio_path = audio_info
                     # 记录路径
-                    logging.info(f"更新音频路径: {audio_info}")
+                    info(f"更新音频路径: {audio_info}")
                 elif isinstance(audio_info, dict):
                     # 如果是音频信息字典
                     if "path" in audio_info:
                         message.audio_path = audio_info["path"]
-                        logging.info(f"更新音频路径: {audio_info['path']}")
+                        info(f"更新音频路径: {audio_info['path']}")
                     
                     # 保存完整的音频信息
                     if hasattr(message, 'audio_data'):
                         message.audio_data = json.dumps(audio_info)
-                        logging.info(f"更新音频数据: {str(audio_info)[:50]}...")
+                        info(f"更新音频数据: {str(audio_info)[:50]}...")
                     else:
-                        logging.error(f"消息对象没有 audio_data 字段")
+                        error(f"消息对象没有 audio_data 字段")
                     
                     # 处理音频段落
                     if "segments" in audio_info and hasattr(self, 'save_audio_segments'):
@@ -149,8 +156,8 @@ class DatabaseService:
                 db.commit()
                 return True
         except Exception as e:
-            logging.error(f"更新消息音频失败: {str(e)}")
-            logging.error(traceback.format_exc())
+            error(f"更新消息音频失败: {str(e)}")
+            error(traceback.format_exc())
             return False
     
     def get_message_by_id(self, message_id):
@@ -170,8 +177,8 @@ class DatabaseService:
                 return None
                 
         except Exception as e:
-            logging.error(f"获取消息失败: {e}")
-            logging.error(traceback.format_exc())
+            error(f"获取消息失败: {e}")
+            error(traceback.format_exc())
             return None
     
     def get_message_by_key(self, key):
@@ -185,8 +192,8 @@ class DatabaseService:
                 return None
                 
         except Exception as e:
-            logging.error(f"获取消息失败: {e}")
-            logging.error(traceback.format_exc())
+            error(f"获取消息失败: {e}")
+            error(traceback.format_exc())
             return None
     
     def load_session(self):
@@ -214,8 +221,8 @@ class DatabaseService:
                 
                 return result
         except Exception as e:
-            logging.error(f"加载会话失败: {e}")
-            logging.error(traceback.format_exc())
+            error(f"加载会话失败: {e}")
+            error(traceback.format_exc())
             return []
     
     def get_session_history(self):
@@ -233,8 +240,8 @@ class DatabaseService:
                 
                 return result
         except Exception as e:
-            logging.error(f"获取会话历史失败: {e}")
-            logging.error(traceback.format_exc())
+            error(f"获取会话历史失败: {e}")
+            error(traceback.format_exc())
             return []
     
     def clear_session(self):
@@ -246,11 +253,11 @@ class DatabaseService:
                 db.query(MergedAudio).delete()
                 db.query(Message).delete()
                 db.commit()
-            logging.info("会话已清空")
+            info("会话已清空")
             return True
         except Exception as e:
-            logging.error(f"清空会话失败: {e}")
-            logging.error(traceback.format_exc())
+            error(f"清空会话失败: {e}")
+            error(traceback.format_exc())
             return False
     
     def get_audio_by_message_id(self, message_id):
@@ -262,16 +269,16 @@ class DatabaseService:
                 # print(f"message_id: {message_id}")
                 # 1. 直接按message_id查询
                 audio = db.query(MergedAudio).filter(MergedAudio.message_id == message_id).first()
-
-                formatted_json = json.dumps(audio.to_dict(), indent=4, ensure_ascii=False, sort_keys=True)
-                print(f"message get_audio_by_message_id: {formatted_json}")
-
+                
                 if audio:
+                    formatted_json = json.dumps(audio.to_dict(), indent=4, ensure_ascii=False, sort_keys=True)
+                    print(f"message get_audio_by_message_id: {formatted_json}")
+
                     return audio.to_dict()
 
         except Exception as e:
-            logging.error(f"灵活查询消息失败: {e}")
-            logging.error(traceback.format_exc())
+            error(f"灵活查询消息失败: {e}")
+            error(traceback.format_exc())
             return None
         
     def ensure_consistent_message_ids(self):
@@ -299,12 +306,12 @@ class DatabaseService:
                 
                 if updated > 0:
                     db.commit()
-                    logging.info(f"已更新{updated}条消息的ID格式")
+                    info(f"已更新{updated}条消息的ID格式")
                 
                 return updated
         except Exception as e:
-            logging.error(f"更新消息ID格式失败: {e}")
-            logging.error(traceback.format_exc())
+            error(f"更新消息ID格式失败: {e}")
+            error(traceback.format_exc())
             return 0
 
     def add_message(self, message_data):
@@ -334,7 +341,7 @@ class DatabaseService:
                 db.commit()
                 return message.id
         except Exception as e:
-            logging.error(f"添加消息失败: {e}")
+            error(f"添加消息失败: {e}")
             return None
 
     def save_audio_segments(self, message_id, segments):
@@ -357,10 +364,10 @@ class DatabaseService:
                     db.add(seg)
                 
                 db.commit()
-                logging.info(f"为消息 {message_id} 保存了 {len(segments)} 个音频段落")
+                info(f"为消息 {message_id} 保存了 {len(segments)} 个音频段落")
                 return True
         except Exception as e:
-            logging.error(f"保存音频段落失败: {str(e)}")
+            error(f"保存音频段落失败: {str(e)}")
             return False
 
     def update_message_audio_path(self, message_id, audio_path):
@@ -375,12 +382,12 @@ class DatabaseService:
                     message = db.query(Message).filter(Message.id == int(message_id)).first()
                 
                 if not message:
-                    logging.error(f"未找到消息 {message_id}")
+                    error(f"未找到消息 {message_id}")
                     return False
                 
                 # 检查 audio_path 属性是否存在
                 if not hasattr(message, 'audio_path'):
-                    logging.error(f"Message 对象没有 audio_path 属性，需要更新数据库模型")
+                    error(f"Message 对象没有 audio_path 属性，需要更新数据库模型")
                     # 尝试使用通用方法更新
                     try:
                         # 使用 __setattr__ 方法设置属性（即使模型中没有定义）

@@ -1,44 +1,108 @@
-# Weebo
+# AI助手后端服务
 
-A real-time speech-to-speech chatbot powered by Whisper Small, Llama 3.2, and Kokoro-82M.
+基于FastAPI的智能对话助手后端服务，支持多种LLM服务和TTS引擎。
 
-Works on Apple Silicon.
+## 项目结构
 
-Learn more [here](https://amanvir.com/weebo).
-
-## Features
-
-- Continuous speech recognition using Whisper MLX
-- Natural language responses via Llama
-- Real-time text-to-speech synthesis with Kokoro-82M
-- Support for different voices
-- Streaming response generation
-
-## Setup
-
-Download required models:
-
-- [`kokoro-v0_19.onnx`](https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/kokoro-v0_19.onnx) (TTS model):
-  `wget https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/kokoro-v0_19.onnx`
-- Pull the llama3.2 model using Ollama: `ollama pull llama3.2`
-- for Mac: `brew install espeak-ng` 
-- for Mac: `export ESPEAK_DATA_PATH=/opt/homebrew/share/espeak-ng-data`
-
-## Usage
-
-Run the chatbot:
-
-```bash
-uv run --python 3.12 --with-requirements requirements.txt main.py
+```
+back-end/
+├── api/                  # API接口层
+│   ├── dependencies/     # 依赖注入
+│   └── routes/           # 路由模块
+├── core/                 # 核心配置
+│   ├── config.py         # 配置管理
+│   └── exceptions.py     # 异常处理
+├── models/               # 数据模型
+│   ├── database/         # 数据库模型
+│   ├── schemas/          # API模式
+│   └── ai/               # AI模型
+├── services/             # 业务服务层
+├── utils/                # 工具函数
+├── resources/            # 资源文件
+├── app.py                # 应用入口点
+└── requirements.txt      # 依赖包列表
 ```
 
-The program will start listening for voice input. Speak naturally and wait for a brief pause - the bot will respond with synthesized speech. Press Ctrl+C to stop.
+## 配置说明
 
-Alternatively, create an environment and install the requirements:
+系统支持多种服务模式配置：
+
+### LLM服务配置
+
+- `LLM_SERVICE_MODE`: 可选 "ollama" 或 "deepseek"
+
+### TTS服务配置
+
+- `TTS_SERVICE_MODE`: 可选 "api", "elevenlabs", "kokoro" 或 "local"
+
+### STT服务配置
+
+- `STT_SERVICE_MODE`: 可选 "api" 或 "whisper"
+
+## 环境变量
+
+可以通过环境变量自定义配置：
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python main.py
+# 基础配置
+export PORT=8080
+export HOST=0.0.0.0
+export ENV=development
+
+# 服务模式
+export LLM_SERVICE_MODE=ollama
+export TTS_SERVICE_MODE=api
+export STT_SERVICE_MODE=api
+
+# API配置
+export OLLAMA_API_URL=http://localhost:11434
+export OLLAMA_MODEL=gemma3:latest
+export DEEPSEEK_API_KEY=your_key_here
+export ELEVENLABS_API_KEY=your_key_here
 ```
+
+## 启动服务
+
+```bash
+# 开发模式
+python app.py
+
+# 生产模式
+export ENV=production
+python app.py
+```
+
+## 可用端点
+
+- `POST /chat`: 处理聊天请求
+- `POST /get_audio`: 获取音频数据
+- `GET /sessions`: 获取会话历史
+
+## 开发指南
+
+### 添加新路由
+
+1. 在 `api/routes/` 中创建新的路由模块
+2. 在 `api/routes/__init__.py` 中导入新模块
+3. 在 `app.py` 中注册新路由
+
+### 添加新服务
+
+1. 在 `services/` 中创建新的服务类
+2. 在 `services/__init__.py` 中导出新服务
+3. 在依赖项中注册新服务
+
+## 依赖库
+
+主要依赖库：
+
+- FastAPI: Web框架
+- Uvicorn: ASGI服务器
+- SQLAlchemy: ORM
+- Kokoro: TTS引擎
+- ElevenLabs: TTS API
+- SoundFile: 音频处理
+
+## 许可证
+
+MIT

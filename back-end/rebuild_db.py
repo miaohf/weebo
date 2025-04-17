@@ -16,7 +16,7 @@ from models.audio import AudioSegment, MergedAudio
 from sqlalchemy import create_engine
 from models.message import Base as MessageBase
 from models.audio import Base as AudioBase
-import config
+from core.config import settings
 from models.base import Base
 
 # 配置日志
@@ -168,21 +168,21 @@ def migrate_data(old_db_path, new_db_path):
 def rebuild_database():
     """重建数据库表"""
     # 确保数据目录存在
-    os.makedirs(os.path.dirname(config.DATABASE_PATH), exist_ok=True)
+    os.makedirs(os.path.dirname(settings.DATABASE_PATH), exist_ok=True)
     
     # 创建数据库引擎
-    engine = create_engine(f"sqlite:///{config.DATABASE_PATH}")
+    engine = create_engine(f"sqlite:///{settings.DATABASE_PATH}")
     
     # 删除并重建表
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     
-    print(f"数据库表已重建: {config.DATABASE_PATH}")
+    print(f"数据库表已重建: {settings.DATABASE_PATH}")
 
 def main():
     """主函数"""
     # 数据库路径
-    db_path = "data/messages.db"
+    db_path = settings.DATABASE_PATH
     
     # 1. 备份数据库
     backup_path = backup_database(db_path)
