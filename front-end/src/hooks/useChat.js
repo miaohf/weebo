@@ -619,12 +619,14 @@ const useChat = () => {
     try {
       setIsLoading(true);
       
-      // 添加用户消息
+      // 添加用户消息 - 统一格式为 english/chinese，确保与服务器返回的格式兼容
       const userMessage = {
         message_id: `user-${Date.now()}`,
         role: 'user',
         message_type: messageType,
         content: {
+          original_text: message,
+          translated_text: message,
           english: message,
           chinese: message
         },
@@ -640,6 +642,8 @@ const useChat = () => {
         role: 'assistant',
         message_type: 'text',
         content: {
+          original_text: '',
+          translated_text: '',
           english: '',
           chinese: ''
         },
@@ -689,6 +693,25 @@ const useChat = () => {
             return; // 处理完音频数据后直接返回
           }
           
+          // 检查并确保chunk包含必要的字段
+          if (chunk.content) {
+            // 确保content有标准格式
+            if (typeof chunk.content === 'string') {
+              chunk.content = {
+                original_text: chunk.content,
+                translated_text: chunk.content
+              };
+            } else if (typeof chunk.content === 'object') {
+              // 确保有original_text和translated_text字段
+              if (!chunk.content.original_text && chunk.content.english) {
+                chunk.content.original_text = chunk.content.english;
+              }
+              if (!chunk.content.translated_text && chunk.content.chinese) {
+                chunk.content.translated_text = chunk.content.chinese;
+              }
+            }
+          }
+          
           // 合并chunk到当前消息
           currentMessage = {
             ...currentMessage,
@@ -696,6 +719,12 @@ const useChat = () => {
             role: 'assistant',
             status: 'success'
           };
+          
+          console.log("更新消息内容:", {
+            messageId: currentMessage.message_id, 
+            contentType: typeof currentMessage.content,
+            content: currentMessage.content
+          });
           
           // 实时更新UI
           setMessages(prev => 
@@ -720,7 +749,12 @@ const useChat = () => {
           msg.message_id === assistantMessageId
             ? { 
                 ...msg, 
-                content: { english: 'send message error', chinese: '发送消息失败' }, 
+                content: { 
+                  original_text: 'send message error', 
+                  translated_text: '发送消息失败',
+                  english: 'send message error', 
+                  chinese: '发送消息失败' 
+                }, 
                 status: 'error' 
               }
             : msg
