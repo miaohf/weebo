@@ -1,7 +1,125 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { API_URL } from '../config';
-import { playMessageAudio, sendChatMessageStreaming } from '../services/api';
+import { sendChatMessageStreaming, getMessageAudio } from '../services/api';
 // import axios from 'axios';
+
+// IndexedDB 缓存管理器
+const AudioCacheManager = {
+  DB_NAME: 'audioCache',
+  STORE_NAME: 'audioData',
+  db: null,
+
+  // 初始化数据库
+  async init() {
+    if (this.db) return this.db;
+
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.DB_NAME, 1);
+      
+      request.onupgradeneeded = (event) => {
+        const db = event.target.result;
+        if (!db.objectStoreNames.contains(this.STORE_NAME)) {
+          db.createObjectStore(this.STORE_NAME, { keyPath: 'messageId' });
+        }
+      };
+      
+      request.onsuccess = (event) => {
+        this.db = event.target.result;
+        console.log('音频缓存数据库初始化成功');
+        resolve(this.db);
+      };
+      
+      request.onerror = (event) => {
+        console.error('音频缓存数据库初始化失败:', event.target.error);
+        reject(event.target.error);
+      };
+    });
+  },
+
+  // 保存音频到缓存
+  async saveAudio(messageId, audioData, format = 'wav') {
+    if (!this.db) await this.init();
+    
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction([this.STORE_NAME], 'readwrite');
+      const store = transaction.objectStore(this.STORE_NAME);
+      
+      const request = store.put({
+        messageId,
+        audioData,
+        format,
+        timestamp: Date.now()
+      });
+      
+      request.onsuccess = () => {
+        console.log(`音频缓存成功: ${messageId}`);
+        resolve(true);
+      };
+      
+      request.onerror = (event) => {
+        console.error(`音频缓存失败: ${messageId}`, event.target.error);
+        reject(event.target.error);
+      };
+    });
+  },
+
+  // 从缓存获取音频
+  async getAudio(messageId) {
+    if (!this.db) await this.init();
+    
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction([this.STORE_NAME], 'readonly');
+      const store = transaction.objectStore(this.STORE_NAME);
+      
+      const request = store.get(messageId);
+      
+      request.onsuccess = (event) => {
+        const result = event.target.result;
+        if (result) {
+          console.log(`从缓存读取音频: ${messageId}`);
+          resolve(result);
+        } else {
+          console.log(`缓存中无此音频: ${messageId}`);
+          resolve(null);
+        }
+      };
+      
+      request.onerror = (event) => {
+        console.error(`读取缓存音频失败: ${messageId}`, event.target.error);
+        reject(event.target.error);
+      };
+    });
+  },
+
+  // 清理过期缓存
+  async cleanExpiredCache(maxAge = 7 * 24 * 60 * 60 * 1000) { // 默认7天过期
+    if (!this.db) await this.init();
+    
+    const now = Date.now();
+    const transaction = this.db.transaction([this.STORE_NAME], 'readwrite');
+    const store = transaction.objectStore(this.STORE_NAME);
+    
+    return new Promise((resolve) => {
+      const request = store.openCursor();
+      let deletedCount = 0;
+      
+      request.onsuccess = (event) => {
+        const cursor = event.target.result;
+        if (cursor) {
+          const data = cursor.value;
+          if (now - data.timestamp > maxAge) {
+            store.delete(cursor.key);
+            deletedCount++;
+          }
+          cursor.continue();
+        } else {
+          console.log(`清理了 ${deletedCount} 条过期音频缓存`);
+          resolve(deletedCount);
+        }
+      };
+    });
+  }
+};
 
 // 简化的基于Promise的分片播放器
 const PromisePlayer = {
@@ -305,47 +423,16 @@ const useChat = () => {
   // 在 useChat 钩子开始处添加自动播放配置
   const [autoPlayAudio, setAutoPlayAudio] = useState(loadSettings('autoPlayAudio', true));
 
-  // 添加一个包装函数来保存 showChinese 状态
-  const setShowChineseWithSave = useCallback((value) => {
-    const newValue = typeof value === 'function' ? value(showChinese) : value;
-    setShowChinese(newValue);
-    saveSettings('showChinese', newValue);
-  }, [showChinese]);
+  // 在 useChat 函数内添加一个新的 ref
+  const processedAudioIdsRef = useRef(new Set());
   
-  // 添加一个包装函数来保存 autoPlayAudio 状态
-  const setAutoPlayAudioWithSave = useCallback((value) => {
-    const newValue = typeof value === 'function' ? value(autoPlayAudio) : value;
-    setAutoPlayAudio(newValue);
-    saveSettings('autoPlayAudio', newValue);
-  }, [autoPlayAudio]);
-
-  // 添加切换函数
-  const toggleAutoPlay = useCallback(() => {
-    setAutoPlayAudioWithSave(prev => !prev);
-  }, [setAutoPlayAudioWithSave]);
-
-  // 将 playAudio 函数移到这里 - 在组件顶层定义
-  const playAudio = useCallback(async (messageId) => {
-    console.log(`请求播放消息 ${messageId} 的音频`);
-    try {
-      console.log(`调用 playMessageAudio API 播放消息 ${messageId}`);
-      await playMessageAudio(messageId);
-      console.log(`消息 ${messageId} 的音频播放请求已发送`);
-    } catch (err) {
-      console.error(`播放消息 ${messageId} 的音频失败:`, err);
-    }
-  }, []);
-
   // 使用函数引用解决循环依赖问题
   const functionRefs = useRef({
     startMessagePlayback: null,
     checkAndQueueNextSegments: null,
     playNextInQueue: null
   });
-
-  // 在 useChat 函数内添加一个新的 ref
-  const processedAudioIdsRef = useRef(new Set());
-
+  
   // 添加消息函数
   const addMessage = useCallback((role, content, messageId = null) => {
     // 生成消息ID（如果没提供）
@@ -407,58 +494,26 @@ const useChat = () => {
       return updatedMessages;
     });
   }, []);
+  
+  // 添加一个包装函数来保存 showChinese 状态
+  const setShowChineseWithSave = useCallback((value) => {
+    const newValue = typeof value === 'function' ? value(showChinese) : value;
+    setShowChinese(newValue);
+    saveSettings('showChinese', newValue);
+  }, [showChinese]);
+  
+  // 添加一个包装函数来保存 autoPlayAudio 状态
+  const setAutoPlayAudioWithSave = useCallback((value) => {
+    const newValue = typeof value === 'function' ? value(autoPlayAudio) : value;
+    setAutoPlayAudio(newValue);
+    saveSettings('autoPlayAudio', newValue);
+  }, [autoPlayAudio]);
 
-  // 修改 handleAudioData 函数
-  const handleAudioData = useCallback(async (messageData) => {
-    try {
-      const { message_id, segment_index, total_segments, audio_data, sample_rate, original_text, translated_text } = messageData;
-      console.log(`处理音频段落 ${segment_index}/${total_segments} for ${message_id}`);
-      
-      // 更新UI状态
-      setMessages(prevMessages => {
-        return prevMessages.map(msg => {
-          if (msg.id === message_id || msg.message_id === message_id) {
-            return {
-              ...msg,
-              audio_data: audio_data,
-              segment_index,
-              total_segments,
-              message_type: 'audio', // 添加类型标记以识别这是音频消息
-              is_audio_segment: true // 添加额外标记以便于检测
-            };
-          }
-          return msg;
-        });
-      });
-      
-      // 添加到Promise播放器
-      PromisePlayer.addSegment(message_id, segment_index, {
-        audio_data,
-        sample_rate,
-        total_segments,
-        original_text,
-        translated_text
-      });
-
-      // 仅在接收第一个分段且message_id不在正在播放的队列中时触发播放
-      if (segment_index === 0 && !PromisePlayer.playedMessages.has(message_id)) {
-        console.log(`收到消息 ${message_id} 的第一个音频段落，触发自动播放`);
-        
-        // 短暂延迟确保UI和音频数据已准备好
-        setTimeout(() => {
-          if (!PromisePlayer.playedMessages.has(message_id)) {
-            console.log('开始自动播放');
-            PromisePlayer.startPlayback(message_id);
-          }
-        }, 100);
-      }
-
-    } catch (error) {
-      console.error('处理音频数据失败:', error);
-      setError('处理音频数据失败');
-    }
-  }, [setMessages, setError]);
-
+  // 添加切换函数
+  const toggleAutoPlay = useCallback(() => {
+    setAutoPlayAudioWithSave(prev => !prev);
+  }, [setAutoPlayAudioWithSave]);
+  
   // 开始播放一条消息的所有分片
   const startMessagePlayback = useCallback((messageId) => {
     console.log(`开始播放消息 ${messageId} 的所有分片`);
@@ -501,7 +556,72 @@ const useChat = () => {
       functionRefs.current.playNextInQueue();
     }
   }, []);
-
+  
+  // 初始化音频缓存
+  useEffect(() => {
+    AudioCacheManager.init()
+      .then(() => console.log('音频缓存系统初始化完成'))
+      .catch(err => console.error('音频缓存系统初始化失败:', err));
+    
+    // 每天清理一次过期缓存
+    const cleanInterval = setInterval(() => {
+      AudioCacheManager.cleanExpiredCache()
+        .then(count => {
+          if (count > 0) {
+            console.log(`定期清理: 删除了 ${count} 条过期音频缓存`);
+          }
+        });
+    }, 24 * 60 * 60 * 1000); // 24小时
+    
+    return () => {
+      clearInterval(cleanInterval);
+    };
+  }, []);
+  
+  // 修改 playAudio 函数，添加缓存支持
+  const playAudio = useCallback(async (messageId) => {
+    console.log(`请求播放消息 ${messageId} 的音频`);
+    try {
+      // 首先尝试从缓存获取
+      const cachedAudio = await AudioCacheManager.getAudio(messageId);
+      
+      if (cachedAudio) {
+        console.log(`使用缓存的音频数据播放消息 ${messageId}`);
+        // 创建音频对象并播放
+        const audio = new Audio();
+        audio.src = `data:audio/${cachedAudio.format};base64,${cachedAudio.audioData}`;
+        await audio.play();
+        return true;
+      }
+      
+      // 缓存中没有，则从API获取
+      console.log(`缓存中无音频数据，调用API获取消息 ${messageId} 的音频`);
+      const audioData = await getMessageAudio(messageId);
+      
+      if (audioData.audio_data) {
+        // 播放音频
+        const audio = new Audio();
+        audio.src = `data:audio/${audioData.format || 'wav'};base64,${audioData.audio_data}`;
+        await audio.play();
+        
+        // 保存到缓存
+        try {
+          await AudioCacheManager.saveAudio(messageId, audioData.audio_data, audioData.format || 'wav');
+        } catch (err) {
+          console.warn('保存API音频到缓存失败:', err);
+        }
+        
+        return true;
+      } else {
+        console.warn(`消息 ${messageId} 没有可用的音频数据`);
+        return false;
+      }
+    } catch (err) {
+      console.error(`播放消息 ${messageId} 的音频失败:`, err);
+      throw err;
+    }
+  }, []);
+  
   // 播放队列中的下一个分片
   const playNextInQueue = useCallback(() => {
     const playback = playbackStateRef.current;
@@ -577,7 +697,68 @@ const useChat = () => {
       console.warn("playAudio 不是一个函数，无法播放");
       playbackStateRef.current.isPlaying = false;
     }
-  }, [playAudio, setCurrentPlayback]); // 添加 playAudio 作为依赖项
+  }, [playAudio, setCurrentPlayback]);
+
+  // 修改 handleAudioData 函数，添加缓存支持
+  const handleAudioData = useCallback(async (messageData) => {
+    try {
+      const { message_id, segment_index, total_segments, audio_data, sample_rate, original_text, translated_text } = messageData;
+      console.log(`处理音频段落 ${segment_index}/${total_segments} for ${message_id}`);
+      
+      // 更新UI状态
+      setMessages(prevMessages => {
+        return prevMessages.map(msg => {
+          if (msg.id === message_id || msg.message_id === message_id) {
+            return {
+              ...msg,
+              audio_data: audio_data,
+              segment_index,
+              total_segments,
+              message_type: 'audio', // 添加类型标记以识别这是音频消息
+              is_audio_segment: true, // 添加额外标记以便于检测
+              has_audio: true // 标记有音频可播放
+            };
+          }
+          return msg;
+        });
+      });
+      
+      // 添加到Promise播放器
+      PromisePlayer.addSegment(message_id, segment_index, {
+        audio_data,
+        sample_rate,
+        total_segments,
+        original_text,
+        translated_text
+      });
+      
+      // 将音频数据保存到缓存（只保存完整音频）
+      if (total_segments === 1 || segment_index === total_segments - 1) {
+        try {
+          await AudioCacheManager.saveAudio(message_id, audio_data, 'wav');
+        } catch (err) {
+          console.warn('保存音频到缓存失败:', err);
+        }
+      }
+
+      // 仅在接收第一个分段且message_id不在正在播放的队列中时触发播放
+      if (segment_index === 0 && !PromisePlayer.playedMessages.has(message_id)) {
+        console.log(`收到消息 ${message_id} 的第一个音频段落，触发自动播放`);
+        
+        // 短暂延迟确保UI和音频数据已准备好
+        setTimeout(() => {
+          if (!PromisePlayer.playedMessages.has(message_id)) {
+            console.log('开始自动播放');
+            PromisePlayer.startPlayback(message_id);
+          }
+        }, 100);
+      }
+
+    } catch (error) {
+      console.error('处理音频数据失败:', error);
+      setError('处理音频数据失败');
+    }
+  }, [setMessages, setError]);
 
   // 处理聊天请求
   const handleChatRequest = useCallback(async (
@@ -589,6 +770,7 @@ const useChat = () => {
   ) => {
     // 在函数作用域顶部声明变量，这样在 try 和 catch 块中都可以访问
     const assistantMessageId = `assistant-${Date.now()}`;
+    const userMessageId = `user-${Date.now()}`;
     
     // 详细记录传入的参数
     console.log('=== 处理聊天请求开始 ===');
@@ -600,7 +782,25 @@ const useChat = () => {
     console.log('files 是否数组:', Array.isArray(files));
     console.log('files 长度:', files ? files.length : 0);
     
-    if (messageType === 'voice' && (!files || files.length === 0)) {
+    // 处理语音消息
+    let userAudioData = null;
+    if (messageType === 'voice' && files && files.length > 0) {
+      try {
+        // 获取音频文件
+        const audioFile = files[0];
+        // 将文件转换为base64
+        const arrayBuffer = await audioFile.arrayBuffer();
+        const uint8Array = new Uint8Array(arrayBuffer);
+        userAudioData = btoa(String.fromCharCode.apply(null, uint8Array));
+        
+        // 保存用户语音到缓存
+        await AudioCacheManager.saveAudio(userMessageId, userAudioData, audioFile.type.split('/')[1] || 'wav');
+        
+        console.log(`用户语音消息已保存到缓存 ${userMessageId}`);
+      } catch (err) {
+        console.error('处理用户语音消息失败:', err);
+      }
+    } else if (messageType === 'voice' && (!files || files.length === 0)) {
       console.error('❌ 错误: 语音消息缺少音频文件!');
     }
     
@@ -621,7 +821,7 @@ const useChat = () => {
       
       // 添加用户消息 - 统一格式为 english/chinese，确保与服务器返回的格式兼容
       const userMessage = {
-        message_id: `user-${Date.now()}`,
+        message_id: userMessageId,
         role: 'user',
         message_type: messageType,
         content: {
@@ -630,13 +830,17 @@ const useChat = () => {
           english: message,
           chinese: message
         },
-        status: 'success'
+        status: 'success',
+        // 如果是语音消息，添加额外属性
+        ...(messageType === 'voice' && userAudioData ? {
+          has_audio: true,
+          audio_data: userAudioData
+        } : {})
       };
       
       setMessages(prev => [...prev, userMessage]);
       
       // 创建初始的助手消息占位符
-      // 不再需要在这里声明 assistantMessageId，因为它已经在函数顶部声明
       const initialAssistantMessage = {
         message_id: assistantMessageId,
         role: 'assistant',
@@ -763,7 +967,7 @@ const useChat = () => {
     }
   }, [handleAudioData]);
 
-  // 清除历史记录
+  // 清除历史记录时也清除音频缓存
   const clearHistory = useCallback(async () => {
     try {
       await fetch(`${API_URL}/chat/clear`, { method: 'POST' });
@@ -772,6 +976,17 @@ const useChat = () => {
       // 清除本地存储的消息
       localStorage.removeItem('chatMessages');
       console.log('已清除本地存储的聊天记录');
+      
+      // 初始化音频播放器
+      PromisePlayer.init();
+      
+      // 清理IndexedDB缓存
+      try {
+        await AudioCacheManager.cleanExpiredCache(0); // 清除所有缓存
+        console.log('已清除音频缓存');
+      } catch (err) {
+        console.error('清除音频缓存失败:', err);
+      }
     } catch (err) {
       setError('清空历史失败');
       console.error(err);

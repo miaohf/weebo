@@ -53,7 +53,9 @@ const MessageList = ({ onAudioData, ...props }) => {
     
     const isAudioMessage = 
       lastMessage.message_type === 'audio' || 
+      lastMessage.message_type === 'voice' ||
       lastMessage.is_audio_segment === true ||
+      lastMessage.has_audio ||
       lastMessage.audio_data || 
       lastMessage.segment_index !== undefined;
     
@@ -107,10 +109,12 @@ const MessageList = ({ onAudioData, ...props }) => {
     }
 
     try {
-      let messageAudio = await getMessageAudio(message.message_id);
-      if (messageAudio.audio_data) {
+      if (message.has_audio && message.audio_data) {
+        console.log('使用消息内嵌的音频数据播放', message.message_id);
+        
         const audio = new Audio();
-        audio.src = `data:audio/${messageAudio.format};base64,${messageAudio.audio_data}`;
+        const format = message.audio_format || 'wav';
+        audio.src = `data:audio/${format};base64,${message.audio_data}`;
         
         audio.onplay = () => {
           setIsPlaying(true);
@@ -128,8 +132,32 @@ const MessageList = ({ onAudioData, ...props }) => {
         };
         
         await audio.play();
-      } else {
-        console.warn('没有可用的音频数据');
+      } 
+      else {
+        let messageAudio = await getMessageAudio(message.message_id);
+        if (messageAudio.audio_data) {
+          const audio = new Audio();
+          audio.src = `data:audio/${messageAudio.format};base64,${messageAudio.audio_data}`;
+          
+          audio.onplay = () => {
+            setIsPlaying(true);
+            setCurrentPlayingAudio(audio);
+            setCurrentPlayingMessageId(message.message_id);
+          };
+          
+          audio.onended = () => {
+            cleanupAudio();
+          };
+          
+          audio.onerror = () => {
+            console.error('音频播放失败');
+            cleanupAudio();
+          };
+          
+          await audio.play();
+        } else {
+          console.warn('没有可用的音频数据');
+        }
       }
     } catch (error) {
       console.error('音频播放失败:', error);
@@ -143,11 +171,17 @@ const MessageList = ({ onAudioData, ...props }) => {
         <div className="empty-chat">Start a new conversation?</div>
       ) : (
         props.messages.map((message, index) => {
-          // console.log(`渲染消息 ${index}:`, {
-          //   id: message.id || message.message_id,
-          //   role: message.role,
-          //   hasAudio: !!message.audio
-          // });
+          const hasAudioCapability = 
+            message.has_audio || 
+            message.audio_data || 
+            message.message_type === 'audio' || 
+            message.message_type === 'voice';
+          
+          console.log(`渲染消息 ${index}:`, {
+            id: message.id || message.message_id,
+            role: message.role,
+            hasAudio: hasAudioCapability
+          });
           
           return (
             <Message 

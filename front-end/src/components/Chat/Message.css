@@ -386,42 +386,81 @@ pre, code {
 }
 
 .replay-audio-btn {
-  background: transparent;
-  color: inherit;
+  background: none;
   border: none;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
-  width: 24px;
-  height: 24px;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s ease;
-  margin-left: 4px;
-  padding: 0;
-  position: relative;
-  vertical-align: middle;
-}
-
-.replay-audio-btn:hover:not(:disabled) {
-  opacity: 0.8;
-  transform: scale(1.1);
-}
-
-.replay-audio-btn.loading {
+  margin-left: 6px;
   opacity: 0.7;
-  cursor: not-allowed;
+  transition: all 0.2s ease;
+  background-color: rgba(0, 0, 0, 0.1);
+  color: var(--text-primary);
+}
+
+.user .replay-audio-btn {
+  color: #ffffff;
+  background-color: rgba(255, 255, 255, 0.25);
+}
+
+.replay-audio-btn:hover {
+  opacity: 1;
+  background-color: rgba(0, 0, 0, 0.2);
+  transform: scale(1.05);
+}
+
+.user .replay-audio-btn:hover {
+  background-color: rgba(255, 255, 255, 0.35);
 }
 
 .replay-audio-btn.playing {
   animation: pulse 1.5s infinite;
-  cursor: not-allowed;
+  opacity: 1;
+  background-color: rgba(82, 153, 229, 0.3);
+}
+
+.user .replay-audio-btn.playing {
+  background-color: rgba(255, 255, 255, 0.5);
+}
+
+.replay-audio-btn.loading .loading-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  border-radius: 50%;
+  border-top-color: var(--text-primary);
+  animation: spin 1s linear infinite;
+}
+
+.user .replay-audio-btn.loading .loading-spinner {
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #ffffff;
 }
 
 @keyframes pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.1); }
-  100% { transform: scale(1); }
+  0% {
+    box-shadow: 0 0 0 0 rgba(82, 153, 229, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(82, 153, 229, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(82, 153, 229, 0);
+  }
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .loading-spinner {
@@ -451,4 +490,23 @@ pre, code {
   border-radius: 8px;
   object-fit: cover;
   box-shadow: 0 2px 4px var(--shadow-color);
+}
+
+/* 语音消息相关样式 */
+.voice-message-container {
+  position: relative;
+}
+
+.voice-message {
+  display: flex;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.voice-message-text {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-style: italic;
+  color: var(--text-primary);
 }

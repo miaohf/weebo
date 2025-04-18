@@ -1,6 +1,98 @@
 import axios from 'axios';
 import { API_URL } from '../config';
 
+// 本地音频缓存管理器
+const AudioCacheManager = {
+  DB_NAME: 'audioCache',
+  STORE_NAME: 'audioData',
+  db: null,
+
+  // 初始化数据库
+  async init() {
+    if (this.db) return this.db;
+
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.DB_NAME, 1);
+      
+      request.onupgradeneeded = (event) => {
+        const db = event.target.result;
+        if (!db.objectStoreNames.contains(this.STORE_NAME)) {
+          db.createObjectStore(this.STORE_NAME, { keyPath: 'messageId' });
+        }
+      };
+      
+      request.onsuccess = (event) => {
+        this.db = event.target.result;
+        console.log('API层音频缓存数据库初始化成功');
+        resolve(this.db);
+      };
+      
+      request.onerror = (event) => {
+        console.error('API层音频缓存数据库初始化失败:', event.target.error);
+        reject(event.target.error);
+      };
+    });
+  },
+
+  // 保存音频到缓存
+  async saveAudio(messageId, audioData, format = 'wav') {
+    if (!this.db) await this.init();
+    
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction([this.STORE_NAME], 'readwrite');
+      const store = transaction.objectStore(this.STORE_NAME);
+      
+      const request = store.put({
+        messageId,
+        audioData,
+        format,
+        timestamp: Date.now()
+      });
+      
+      request.onsuccess = () => {
+        console.log(`API层音频缓存成功: ${messageId}`);
+        resolve(true);
+      };
+      
+      request.onerror = (event) => {
+        console.error(`API层音频缓存失败: ${messageId}`, event.target.error);
+        reject(event.target.error);
+      };
+    });
+  },
+
+  // 从缓存获取音频
+  async getAudio(messageId) {
+    if (!this.db) await this.init();
+    
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction([this.STORE_NAME], 'readonly');
+      const store = transaction.objectStore(this.STORE_NAME);
+      
+      const request = store.get(messageId);
+      
+      request.onsuccess = (event) => {
+        const result = event.target.result;
+        if (result) {
+          console.log(`API层从缓存读取音频: ${messageId}`);
+          resolve(result);
+        } else {
+          console.log(`API层缓存中无此音频: ${messageId}`);
+          resolve(null);
+        }
+      };
+      
+      request.onerror = (event) => {
+        console.error(`API层读取缓存音频失败: ${messageId}`, event.target.error);
+        reject(event.target.error);
+      };
+    });
+  }
+};
+
+// 初始化缓存
+AudioCacheManager.init().catch(err => console.error('初始化API层音频缓存失败:', err));
+
 // 获取消息历史
 export const fetchChatHistory = async () => {
   try {
@@ -211,6 +303,20 @@ export const sendChatMessageStreaming = async (message, files = [], messageType 
 // 播放音频
 export const playMessageAudio = async (messageId) => {
   try {
+    // 首先尝试从缓存获取
+    const cachedAudio = await AudioCacheManager.getAudio(messageId);
+    
+    if (cachedAudio) {
+      console.log(`API层使用缓存的音频数据播放消息 ${messageId}`);
+      // 创建音频对象并播放
+      const audio = new Audio();
+      audio.src = `data:audio/${cachedAudio.format};base64,${cachedAudio.audioData}`;
+      await audio.play();
+      return true;
+    }
+    
+    // 缓存中没有，则从API获取
+    console.log(`API层缓存中无音频数据，请求服务器获取消息 ${messageId} 的音频`);
     const response = await axios.get(`${API_URL}/audio/${messageId}`, {
       responseType: 'blob'
     });
@@ -225,6 +331,18 @@ export const playMessageAudio = async (messageId) => {
       URL.revokeObjectURL(audioUrl);
     };
     
+    // 转换为Base64并保存到缓存
+    try {
+      const reader = new FileReader();
+      reader.readAsDataURL(audioBlob);
+      reader.onloadend = async () => {
+        const base64data = reader.result.split(',')[1]; // 去掉前缀
+        await AudioCacheManager.saveAudio(messageId, base64data, 'wav');
+      };
+    } catch (err) {
+      console.warn('保存音频到API层缓存失败:', err);
+    }
+    
     await audio.play();
     return true;
   } catch (error) {
@@ -236,13 +354,41 @@ export const playMessageAudio = async (messageId) => {
 // 获取历史音频
 export const getMessageAudio = async (messageId) => {
   try {
+    // 首先尝试从缓存获取
+    const cachedAudio = await AudioCacheManager.getAudio(messageId);
+    
+    if (cachedAudio) {
+      console.log(`API层从缓存获取音频数据: ${messageId}`);
+      return {
+        message_id: messageId,
+        audio_data: cachedAudio.audioData,
+        format: cachedAudio.format
+      };
+    }
+    
+    // 缓存中没有，从API获取
+    console.log(`API层缓存中无音频数据，从服务器获取: ${messageId}`);
     const formData = new FormData();
     formData.append('message_id', messageId);
     
     const response = await axios.post(`${API_URL}/get_audio`, formData);
+    
+    // 保存到缓存
+    if (response.data && response.data.audio_data) {
+      try {
+        await AudioCacheManager.saveAudio(
+          messageId, 
+          response.data.audio_data, 
+          response.data.format || 'wav'
+        );
+      } catch (err) {
+        console.warn('保存音频到API层缓存失败:', err);
+      }
+    }
+    
     return response.data;
   } catch (error) {
-    console.error('Error fetching audio:', error);
+    console.error('获取音频失败:', error);
     throw error;
   }
 };

@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { FaVolumeUp } from 'react-icons/fa';
+import { FaVolumeUp, FaMicrophone } from 'react-icons/fa';
 import ChatBubble from '../ChatBubble';
 import './Message.css';
 
 const Message = ({ message, showChinese, onPlayAudio, onReplayAudio, isPlaying }) => {
-  const { message_id, content, role, status, segment_index, total_segments } = message;
+  const { message_id, content, role, status, segment_index, total_segments, has_audio, message_type } = message;
   const isAssistant = role === 'assistant';
+  const isUserAudio = role === 'user' && (message_type === 'voice' || has_audio);
   const [isLoading, setIsLoading] = useState(false);
   
   // 检查是否收到所有音频分片
@@ -23,6 +24,8 @@ const Message = ({ message, showChinese, onPlayAudio, onReplayAudio, isPlaying }
     hasChinese: content && typeof content === 'object' && 'chinese' in content,
     hasOriginalText: content && typeof content === 'object' && 'original_text' in content,
     hasTranslatedText: content && typeof content === 'object' && 'translated_text' in content,
+    hasAudio: has_audio,
+    messageType: message_type,
     segment_index,
     total_segments,
     isAudioComplete
@@ -92,24 +95,47 @@ const Message = ({ message, showChinese, onPlayAudio, onReplayAudio, isPlaying }
   // 获取消息内容
   const { original, translated } = getMessageContent();
   
+  // 渲染音频控件
+  const renderAudioButton = () => {
+    if ((isAssistant && status !== 'loading' && isAudioComplete) || isUserAudio) {
+      return (
+        <button 
+          className={`replay-audio-btn ${isLoading ? 'loading' : ''} ${isPlaying ? 'playing' : ''}`}
+          onClick={handleReplay}
+          disabled={isLoading || isPlaying}
+          title={isLoading ? "获取语音中..." : isPlaying ? "正在播放..." : "播放语音"}
+        >
+          {isLoading ? <span className="loading-spinner" /> : (
+            isUserAudio ? <FaMicrophone /> : <FaVolumeUp />
+          )}
+        </button>
+      );
+    }
+    return null;
+  };
+  
+  // 确定显示内容  
   let displayContent = null;
   
-  if (showChinese && role === 'assistant') {
+  // 判断是否显示用户语音消息
+  if (isUserAudio) {
+    displayContent = (
+      <div className="voice-message">
+        <p className="voice-message-text">
+          {original || '🎤 语音消息'}
+          {renderAudioButton()}
+        </p>
+      </div>
+    );
+  }
+  // 显示正常文本消息
+  else if (showChinese && role === 'assistant') {
     // 显示双语内容
     displayContent = (
       <>
         <p className="message-orginal">
           {original || ''}
-          {isAssistant && status !== 'loading' && isAudioComplete && (
-            <button 
-              className={`replay-audio-btn ${isLoading ? 'loading' : ''} ${isPlaying ? 'playing' : ''}`}
-              onClick={handleReplay}
-              disabled={isLoading || isPlaying}
-              title={isLoading ? "获取语音中..." : isPlaying ? "正在播放..." : "重新播放语音"}
-            >
-              {isLoading ? <span className="loading-spinner" /> : <FaVolumeUp />}
-            </button>
-          )}
+          {renderAudioButton()}
         </p>
         {translated && translated !== original && (
           <p className="message-translated">{translated}</p>
@@ -121,22 +147,13 @@ const Message = ({ message, showChinese, onPlayAudio, onReplayAudio, isPlaying }
     displayContent = (
       <p>
         {original || ''}
-        {isAssistant && status !== 'loading' && isAudioComplete && (
-          <button 
-            className={`replay-audio-btn ${isLoading ? 'loading' : ''} ${isPlaying ? 'playing' : ''}`}
-            onClick={handleReplay}
-            disabled={isLoading || isPlaying}
-            title={isLoading ? "获取语音中..." : isPlaying ? "正在播放..." : "重新播放语音"}
-          >
-            {isLoading ? <span className="loading-spinner" /> : <FaVolumeUp />}
-          </button>
-        )}
+        {renderAudioButton()}
       </p>
     );
   }
   
   return (
-    <div className={`message-container ${role || 'unknown'}`}>
+    <div className={`message-container ${role || 'unknown'} ${isUserAudio ? 'voice-message-container' : ''}`}>
       <div className="message-content">
         <ChatBubble 
           message={
