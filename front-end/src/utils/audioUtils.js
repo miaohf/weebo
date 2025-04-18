@@ -72,7 +72,11 @@ export function createAudioPlayer() {
         
         source.start(0);
         return new Promise(resolve => {
-          source.onended = resolve;
+          source.onended = () => {
+            // 触发自定义事件，通知音频播放结束
+            window.dispatchEvent(new CustomEvent('audio-playback-ended'));
+            resolve();
+          };
         });
       } catch (error) {
         console.error("解码Base64音频失败:", error);
@@ -89,7 +93,11 @@ export function createAudioPlayer() {
       source.connect(audioContext.destination);
       
       return new Promise((resolve) => {
-        source.onended = resolve;
+        source.onended = () => {
+          // 触发自定义事件，通知音频播放结束
+          window.dispatchEvent(new CustomEvent('audio-playback-ended'));
+          resolve();
+        };
         source.start(0);
       });
     }
@@ -127,7 +135,11 @@ export function createAudioPlayer() {
       source.connect(audioContext.destination);
       
       return new Promise((resolve) => {
-        source.onended = resolve;
+        source.onended = () => {
+          // 触发自定义事件，通知音频播放结束
+          window.dispatchEvent(new CustomEvent('audio-playback-ended'));
+          resolve();
+        };
         source.start(0);
       });
     }

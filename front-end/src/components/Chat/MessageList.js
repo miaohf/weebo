@@ -6,7 +6,7 @@ import './MessageList.css';
 const MessageList = ({ onAudioData, ...props }) => {
   const messagesEndRef = useRef(null);
   const [currentPlayingAudio, setCurrentPlayingAudio] = useState(null);
-  const [, setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [currentPlayingMessageId, setCurrentPlayingMessageId] = useState(null);
   const lastMessageIdRef = useRef(null);
   const receivedAudioRef = useRef(false);
@@ -80,6 +80,11 @@ const MessageList = ({ onAudioData, ...props }) => {
   }, [props.messages]);
 
   const cleanupAudio = useCallback(() => {
+    console.log('[MessageList] 清理音频播放状态:', {
+      hasCurrentAudio: !!currentPlayingAudio,
+      currentPlayingMessageId
+    });
+    
     if (currentPlayingAudio) {
       currentPlayingAudio.pause();
       currentPlayingAudio.currentTime = 0;
@@ -90,7 +95,13 @@ const MessageList = ({ onAudioData, ...props }) => {
     setCurrentPlayingAudio(null);
     setIsPlaying(false);
     setCurrentPlayingMessageId(null);
-  }, [currentPlayingAudio]);
+    
+    // 触发自定义事件，通知音频播放结束
+    console.log('[MessageList] 触发音频结束事件');
+    window.dispatchEvent(new CustomEvent('audio-playback-ended', {
+      detail: { messageId: currentPlayingMessageId }
+    }));
+  }, [currentPlayingAudio, currentPlayingMessageId]);
 
   useEffect(() => {
     return () => {
@@ -99,71 +110,102 @@ const MessageList = ({ onAudioData, ...props }) => {
   }, [cleanupAudio]);
 
   const handleReplayAudio = useCallback(async (message) => {
-    if (currentPlayingMessageId === message.message_id) {
+    const messageId = message.id || message.message_id;
+    console.log(`[MessageList] 处理音频播放请求:`, {
+      requestedMessageId: messageId, 
+      currentPlaying: currentPlayingMessageId,
+      isCurrentlyPlaying: isPlaying
+    });
+    
+    // 如果点击的是当前正在播放的消息，停止播放
+    if (isPlaying && currentPlayingMessageId === messageId) {
+      console.log(`[MessageList] 停止当前播放的音频:`, messageId);
       cleanupAudio();
       return;
     }
 
+    // 如果有其他音频正在播放，先停止
     if (currentPlayingAudio) {
+      console.log(`[MessageList] 停止之前播放的音频:`, currentPlayingMessageId);
       cleanupAudio();
     }
 
     try {
       if (message.has_audio && message.audio_data) {
-        console.log('使用消息内嵌的音频数据播放', message.message_id);
+        console.log('[MessageList] 使用消息内嵌的音频数据播放', messageId);
         
         const audio = new Audio();
         const format = message.audio_format || 'wav';
         audio.src = `data:audio/${format};base64,${message.audio_data}`;
         
+        // 设置播放状态标记
+        setIsPlaying(true);
+        setCurrentPlayingMessageId(messageId);
+        
         audio.onplay = () => {
           setIsPlaying(true);
           setCurrentPlayingAudio(audio);
-          setCurrentPlayingMessageId(message.message_id);
+          setCurrentPlayingMessageId(messageId);
         };
         
         audio.onended = () => {
+          console.log(`[MessageList] 音频播放完成:`, messageId);
+          // 显式触发自定义事件，确保通知到所有组件
+          window.dispatchEvent(new CustomEvent('audio-playback-ended', {
+            detail: { messageId: messageId }
+          }));
           cleanupAudio();
         };
         
         audio.onerror = () => {
-          console.error('音频播放失败');
+          console.error('[MessageList] 音频播放失败:', messageId);
           cleanupAudio();
         };
         
         await audio.play();
       } 
       else {
-        let messageAudio = await getMessageAudio(message.message_id);
+        console.log('[MessageList] 获取消息音频数据:', messageId);
+        let messageAudio = await getMessageAudio(messageId);
         if (messageAudio.audio_data) {
           const audio = new Audio();
           audio.src = `data:audio/${messageAudio.format};base64,${messageAudio.audio_data}`;
           
+          // 设置播放状态标记
+          setIsPlaying(true);
+          setCurrentPlayingMessageId(messageId);
+          
           audio.onplay = () => {
             setIsPlaying(true);
             setCurrentPlayingAudio(audio);
-            setCurrentPlayingMessageId(message.message_id);
+            setCurrentPlayingMessageId(messageId);
           };
           
           audio.onended = () => {
+            console.log(`[MessageList] 音频播放完成:`, messageId);
+            // 显式触发自定义事件，确保通知到所有组件
+            window.dispatchEvent(new CustomEvent('audio-playback-ended', {
+              detail: { messageId: messageId }
+            }));
             cleanupAudio();
           };
           
           audio.onerror = () => {
-            console.error('音频播放失败');
+            console.error('[MessageList] 音频播放失败:', messageId);
             cleanupAudio();
           };
           
           await audio.play();
         } else {
-          console.warn('没有可用的音频数据');
+          console.warn('[MessageList] 没有可用的音频数据:', messageId);
+          cleanupAudio();
         }
       }
     } catch (error) {
-      console.error('音频播放失败:', error);
+      console.error('[MessageList] 音频播放失败:', messageId, error);
       cleanupAudio();
     }
-  }, [cleanupAudio, currentPlayingAudio, currentPlayingMessageId, setIsPlaying, setCurrentPlayingAudio, setCurrentPlayingMessageId]);
+  }, [cleanupAudio, currentPlayingAudio, currentPlayingMessageId, isPlaying, setIsPlaying, setCurrentPlayingAudio, setCurrentPlayingMessageId]);
 
   return (
     <div className="message-list-container">
@@ -190,7 +232,7 @@ const MessageList = ({ onAudioData, ...props }) => {
               showChinese={props.showChinese}
               onReplayAudio={handleReplayAudio}
               onPlayAudio={props.onPlayAudio}
-              isPlaying={currentPlayingMessageId === message.message_id}
+              isPlaying={isPlaying && currentPlayingMessageId === (message.id || message.message_id)}
             />
           );
         })

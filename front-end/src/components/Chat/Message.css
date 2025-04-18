@@ -1,3 +1,4 @@
+/* 消息基本样式 */
 .message {
   position: relative;
   /* margin-bottom: 6px;  */
@@ -21,6 +22,7 @@
   margin-right: auto;
 }
 
+/* 消息气泡样式 */
 .message-bubble {
   padding: 12px 16px;
   border-radius: 18px;
@@ -73,6 +75,7 @@
   padding: 2px;
 }
 
+/* 消息内容样式 */
 .message-content {
   overflow-wrap: break-word;
   word-break: break-word;
@@ -80,11 +83,29 @@
   /* padding-right: 32px;  */
 }
 
-/* Ensure content doesn't overflow */
 .message-content p {
   margin: 0;
   padding: 0;
   color: #333; /* 确保文字颜色与背景对比明显 */
+}
+
+.message-text-container {
+  position: relative;
+  display: block;
+  /* margin-bottom: 8px; */
+  line-height: 1.4;
+}
+
+.message-text {
+  display: inline;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.message-content p,
+.message-translated {
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .message-image-container {
@@ -124,19 +145,6 @@
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
-}
-
-.message-orginal {
-  margin: 0 0 8px 0;
-  padding: 0;
-  /* font-size: 15px; */
-  /* color: #444; */
-}
-
-.message-translated {
-  font-size: 14px;
-  /* color: #f5f0f0; */
-  /* margin-top: 16px; */
 }
 
 .message-actions {
@@ -185,296 +193,126 @@
   opacity: 1;
 }
 
-.play-icon {
-  display: inline-block;
-  width: 0;
-  height: 0;
-  border-style: solid;
-  border-width: 4px 0 4px 6px;
-  border-color: transparent transparent transparent currentColor;
+.audio-button-wrapper {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  flex-shrink: 0;
+  vertical-align: text-bottom;
+  position: relative;
+  bottom: -1px;
 }
 
-.play-audio-button.playing .play-icon {
-  width: 8px;
-  height: 8px;
-  border: none;
-  border-style: double;
-  border-width: 0 0 0 8px;
-  border-color: currentColor;
-}
-
-.play-audio-button:active {
-  transform: scale(0.95);
-}
-
-@media (max-width: 480px) {
-  .message-bubble {
-    padding: var(--spacing-sm);
-  }
-  
-  .play-audio-button {
-    font-size: 0.7rem;
-    padding: 1px 4px;
-  }
-  
-  .play-icon {
-    border-width: 3px 0 3px 5px;
-  }
-  
-  .header-left {
-    gap: 4px;
-  }
-}
-
-@media (prefers-color-scheme: dark) {
-  .message.user .message-bubble {
-    background-color: #7c4dff;
-    color: white;
-  }
-  
-  .message.assistant .message-bubble {
-    background-color: #311b92;
-    color: #b388ff;
-  }
-
-  .message-orginal,
-  .message-translated,
-  .audio-message-text,
-  .replay-audio-btn,
-  .play-audio-button,
-  .message-role,
-  .message-header,
-  .voice-indicator,
-  .message-content p {
-    color: inherit;
-  }
-
-  .message.user .message-bubble::after {
-    border-left-color: #7c4dff;
-  }
-  
-  .message.assistant .message-bubble::after {
-    border-right-color: #311b92;
-  }
-
-  .message.user .audio-message-icon {
-    color: white;
-  }
-
-  .message.assistant .audio-message-icon {
-    color: #b388ff;
-  }
-
-  .play-audio-button.playing {
-    color: inherit;
-  }
-
-  .play-audio-button:hover:not(:disabled) {
-    opacity: 0.8;
-  }
-}
-
-/* 可选配色方案 */
-.theme-soft .message.user .message-bubble {
-  background-color: #64b5f6;
-}
-
-.theme-soft .message.assistant .message-bubble {
-  background-color: #e8f5e9;
-}
-
-.theme-gray .message.user .message-bubble {
-  background-color: #78909c;
-}
-
-.theme-gray .message.assistant .message-bubble {
-  background-color: #eceff1;
-}
-
-.theme-green .message.user .message-bubble {
-  background-color: #4caf50;
-}
-
-.theme-green .message.assistant .message-bubble {
-  background-color: #e8f5e9;
-}
-
-/* 添加加载指示器样式 */
-.loading-indicator {
-  display: flex;
-  justify-content: center;
-  margin-top: 8px;
-  margin-bottom: 0;
-}
-
-.loading-indicator .dot {
-  background-color: #888;
-  border-radius: 50%;
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  margin: 0 3px;
-  animation: bounce 1.4s infinite ease-in-out both;
-}
-
-.loading-indicator .dot:nth-child(1) {
-  animation-delay: -0.32s;
-}
-
-.loading-indicator .dot:nth-child(2) {
-  animation-delay: -0.16s;
-}
-
-@keyframes bounce {
-  0%, 80%, 100% { transform: scale(0); }
-  40% { transform: scale(1); }
-}
-
-/* 中文内容的容器 - 始终保留空间 */
-.chinese-content-placeholder {
-  min-height: 0;
-  max-height: 0;
-  overflow: hidden;
-  opacity: 0;
-  transition: opacity 0.2s ease, max-height 0.3s ease;
-}
-
-/* 当显示中文时展开容器 */
-.show-chinese .chinese-content-placeholder {
-  min-height: 24px;
-  max-height: 1000px;
-  opacity: 1;
-}
-
-/* 或者使用另一种风格，中英文并排显示 */
-/*
-.message-content {
-  display: flex;
-  flex-direction: column;
-}
-
-.message-orginal, .message-translated {
-  margin-bottom: 4px;
-}
-
-.message-translated {
-  color: #555;
-  font-style: italic;
-}
-*/
-
-/* Fix for long content */
-pre, code {
-  white-space: pre-wrap;
-  overflow-x: auto;
-}
-
-/* Add vertical spacing between elements inside messages */
-.message-content > * {
-  margin-bottom: 4px;
-}
-
-.message-content > *:last-child {
-  margin-bottom: 0;
-}
-
-.chat-container {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden; /* Prevents scrolling on the container */
-}
-
+/* 基础按钮样式 - 使用CSS变量 */
 .replay-audio-btn {
   background: none;
   border: none;
-  width: 30px;
-  height: 30px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  margin-left: 6px;
-  opacity: 0.7;
+  opacity: 0.8;
   transition: all 0.2s ease;
-  background-color: rgba(0, 0, 0, 0.1);
-  color: var(--text-primary);
+  background-color: var(--button-bg, rgba(255, 255, 255, 0.25));
+  color: var(--button-color, #ffffff);
+  padding: 0;
+  margin: 0;
+  flex-shrink: 0;
+  font-size: 8px;
+  line-height: 1;
 }
 
-.user .replay-audio-btn {
-  color: #ffffff;
-  background-color: rgba(255, 255, 255, 0.25);
+/* 用户消息和语音消息的按钮背景样式 */
+.user .replay-audio-btn,
+.voice-message .replay-audio-btn,
+.assistant .replay-audio-btn {
+  margin-left: 4px;
 }
 
+/* 图标统一样式 */
+.play-icon, .pause-icon {
+  font-size: 70%;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 50%;
+  height: 50%;
+}
+
+/* 悬停状态 */
 .replay-audio-btn:hover {
   opacity: 1;
-  background-color: rgba(0, 0, 0, 0.2);
+  background-color: var(--button-hover-bg, rgba(255, 255, 255, 0.4));
   transform: scale(1.05);
 }
 
-.user .replay-audio-btn:hover {
-  background-color: rgba(255, 255, 255, 0.35);
-}
-
+/* 播放状态 - 只添加脉冲动画，颜色保持一致 */
 .replay-audio-btn.playing {
   animation: pulse 1.5s infinite;
-  opacity: 1;
-  background-color: rgba(82, 153, 229, 0.3);
+  /* 不修改颜色、背景色和其他属性，保持与非播放状态一致 */
 }
 
-.user .replay-audio-btn.playing {
-  background-color: rgba(255, 255, 255, 0.5);
-}
-
+/* 加载状态的颜色 */
 .replay-audio-btn.loading .loading-spinner {
   display: inline-block;
-  width: 12px;
-  height: 12px;
-  border: 2px solid rgba(0, 0, 0, 0.2);
+  width: 8px;
+  height: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
   border-radius: 50%;
-  border-top-color: var(--text-primary);
+  border-top-color: var(--button-color, #ffffff);
   animation: spin 1s linear infinite;
 }
 
-.user .replay-audio-btn.loading .loading-spinner {
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  border-top-color: #ffffff;
+/* 添加主题响应样式 */
+:root {
+  /* 默认亮色主题 */
+  --button-bg: rgba(255, 255, 255, 0.25);
+  --button-color: #ffffff;
+  --button-hover-bg: rgba(255, 255, 255, 0.4);
 }
 
-@keyframes pulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(82, 153, 229, 0.4);
-  }
-  70% {
-    box-shadow: 0 0 0 6px rgba(82, 153, 229, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(82, 153, 229, 0);
-  }
-}
-
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
+/* 深色主题 */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --button-bg: rgba(255, 255, 255, 0.2);
+    --button-color: #ffffff;
+    --button-hover-bg: rgba(255, 255, 255, 0.35);
   }
 }
 
-.loading-spinner {
-  width: 14px;
-  height: 14px;
-  border: 2px solid var(--button-bg);
-  border-top: 2px solid var(--loading-dot);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
+/* 可选主题样式 */
+.theme-light {
+  --button-bg: rgba(255, 255, 255, 0.25);
+  --button-color: #ffffff;
+  --button-hover-bg: rgba(255, 255, 255, 0.4);
 }
 
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+.theme-dark {
+  --button-bg: rgba(255, 255, 255, 0.2);
+  --button-color: #ffffff;
+  --button-hover-bg: rgba(255, 255, 255, 0.35);
+}
+
+.theme-blue {
+  --button-bg: rgba(25, 118, 210, 0.2);
+  --button-color: #1976d2;
+  --button-hover-bg: rgba(25, 118, 210, 0.3);
+}
+
+.theme-green {
+  --button-bg: rgba(76, 175, 80, 0.2);
+  --button-color: #4caf50;
+  --button-hover-bg: rgba(76, 175, 80, 0.3);
+}
+
+.theme-purple {
+  --button-bg: rgba(124, 77, 255, 0.2);
+  --button-color: #7c4dff;
+  --button-hover-bg: rgba(124, 77, 255, 0.3);
 }
 
 .message-images {
@@ -492,7 +330,7 @@ pre, code {
   box-shadow: 0 2px 4px var(--shadow-color);
 }
 
-/* 语音消息相关样式 */
+/* 语音消息样式 */
 .voice-message-container {
   position: relative;
 }
@@ -500,13 +338,67 @@ pre, code {
 .voice-message {
   display: flex;
   align-items: center;
-  margin-bottom: 5px;
+  background-color: rgba(0, 0, 0, 0.05);
+  border-radius: 18px;
+  padding: 8px 12px;
+  max-width: 260px;
+}
+
+.voice-message-icon {
+  margin-right: 8px;
+  color: var(--primary-color);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .voice-message-text {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-style: italic;
-  color: var(--text-primary);
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+  margin-right: 0;
+  flex: 1;
+}
+
+.user .voice-message {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.user .voice-message-text {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.user .voice-message-icon {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.message-translated {
+  font-size: 14px;
+  color: #666;
+  margin-top: -4px;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(82, 153, 229, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 3px rgba(82, 153, 229, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(82, 153, 229, 0);
+  }
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }

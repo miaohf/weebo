@@ -25,9 +25,13 @@ export default function useAudio() {
       await audioPlayerRef.current.play(audioData);
       
       console.log('音频播放完成');
+      // 手动触发自定义事件，确保播放完成被通知到所有组件
+      window.dispatchEvent(new CustomEvent('audio-playback-ended'));
     } catch (error) {
       console.error('播放音频失败:', error);
       dispatch({ type: ActionTypes.SET_ERROR, payload: `播放音频失败: ${error.message}` });
+      // 出错时也需要触发事件
+      window.dispatchEvent(new CustomEvent('audio-playback-ended'));
     } finally {
       dispatch({ type: ActionTypes.SET_PLAYING, payload: null });
     }
