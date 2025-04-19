@@ -1,5 +1,5 @@
 // 服务器地址配置
-export const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
+export const API_URL = process.env.REACT_APP_API_URL || 'http://api.miaohf.com';
 
 // 音频配置
 export const AUDIO_CONFIG = {

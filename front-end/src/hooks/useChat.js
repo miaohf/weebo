@@ -731,16 +731,68 @@ const useChat = () => {
         original_text,
         translated_text
       });
-      
-      // 将音频数据保存到缓存（只保存完整音频）
-      if (total_segments === 1 || segment_index === total_segments - 1) {
-        try {
-          await AudioCacheManager.saveAudio(message_id, audio_data, 'wav');
-        } catch (err) {
-          console.warn('保存音频到缓存失败:', err);
-        }
-      }
 
+      // 更新音频段落缓存
+      setAudioSegmentsCache(prevCache => {
+        // 如果消息ID不存在，初始化一个新的缓存对象
+        if (!prevCache[message_id]) {
+          prevCache[message_id] = {
+            segments: {},
+            total: total_segments
+          };
+        }
+        
+        // 更新当前分段
+        prevCache[message_id].segments = {
+          ...prevCache[message_id].segments,
+          [segment_index]: audio_data
+        };
+        
+        // 检查是否所有分片都已收到
+        const receivedSegments = Object.keys(prevCache[message_id].segments).length;
+        const allSegmentsReceived = receivedSegments === total_segments;
+        
+        console.log(`[AudioCache] 消息 ${message_id} 的音频段落状态:`, {
+          当前段落: segment_index,
+          总段落数: total_segments,
+          已接收段落数: receivedSegments,
+          是否全部接收: allSegmentsReceived,
+          已缓存的段落: Object.keys(prevCache[message_id].segments).join(',')
+        });
+        
+        // 如果所有分片都已收到，合并并保存到缓存
+        if (allSegmentsReceived) {
+          console.log(`[AudioCache] 所有音频分片(${total_segments})已接收完成，开始合并并缓存`);
+          
+          // 合并所有分片的base64数据
+          let mergedAudio = '';
+          for (let i = 0; i < total_segments; i++) {
+            const segmentData = prevCache[message_id].segments[i];
+            if (segmentData) {
+              mergedAudio += segmentData;
+              console.log(`[AudioCache] 合并分片 ${i}，数据长度: ${segmentData.length}`);
+            } else {
+              console.warn(`[AudioCache] 警告: 分片 ${i} 数据缺失!`);
+            }
+          }
+          
+          console.log(`[AudioCache] 合并后音频数据总长度: ${mergedAudio.length}`);
+          
+          // 保存合并后的完整音频到缓存
+          if (mergedAudio) {
+            AudioCacheManager.saveAudio(message_id, mergedAudio, 'wav')
+              .then(() => console.log(`[AudioCache] 成功缓存合并后的完整音频: ${message_id}, 长度: ${mergedAudio.length}`))
+              .catch(err => console.warn('[AudioCache] 保存合并音频到缓存失败:', err));
+          } else {
+            console.error(`[AudioCache] 错误: 合并后的音频数据为空!`);
+          }
+        } else {
+          console.log(`[AudioCache] 已接收 ${receivedSegments}/${total_segments} 个音频分片，继续等待...`);
+        }
+        
+        return {...prevCache};
+      });
+      
       // 仅在接收第一个分段且message_id不在正在播放的队列中时触发播放
       if (segment_index === 0 && !PromisePlayer.playedMessages.has(message_id)) {
         console.log(`收到消息 ${message_id} 的第一个音频段落，触发自动播放`);
@@ -788,17 +840,42 @@ const useChat = () => {
       try {
         // 获取音频文件
         const audioFile = files[0];
+        console.log(`[AudioDebug] 语音消息原始文件信息:`, {
+          类型: audioFile.type,
+          大小: audioFile.size,
+          最后修改时间: audioFile.lastModified
+        });
+        
         // 将文件转换为base64
         const arrayBuffer = await audioFile.arrayBuffer();
         const uint8Array = new Uint8Array(arrayBuffer);
         userAudioData = btoa(String.fromCharCode.apply(null, uint8Array));
         
+        console.log(`[AudioDebug] 语音消息Base64转换后:`, {
+          数据长度: userAudioData.length,
+          前20个字符: userAudioData.substring(0, 20) + '...',
+          后20个字符: '...' + userAudioData.substring(userAudioData.length - 20)
+        });
+        
         // 保存用户语音到缓存
         await AudioCacheManager.saveAudio(userMessageId, userAudioData, audioFile.type.split('/')[1] || 'wav');
         
-        console.log(`用户语音消息已保存到缓存 ${userMessageId}`);
+        console.log(`[AudioDebug] 用户语音消息已保存到缓存 ${userMessageId}`);
+        
+        // 检查音频文件类型和编码信息
+        let audioInfo = "未识别的音频格式";
+        if (audioFile.type.includes('wav')) {
+          audioInfo = '标准WAV格式';
+        } else if (audioFile.type.includes('webm')) {
+          audioInfo = 'WebM格式 (可能使用Opus编码)';
+        } else if (audioFile.type.includes('ogg')) {
+          audioInfo = 'OGG格式 (可能使用Vorbis或Opus编码)';
+        } else if (audioFile.type.includes('mp4') || audioFile.type.includes('mp3')) {
+          audioInfo = 'MP3/MP4格式 (使用AAC或MP3编码)';
+        }
+        console.log(`[AudioDebug] 音频格式分析: ${audioInfo}`);
       } catch (err) {
-        console.error('处理用户语音消息失败:', err);
+        console.error('[AudioDebug] 处理用户语音消息失败:', err);
       }
     } else if (messageType === 'voice' && (!files || files.length === 0)) {
       console.error('❌ 错误: 语音消息缺少音频文件!');
@@ -980,6 +1057,9 @@ const useChat = () => {
       // 初始化音频播放器
       PromisePlayer.init();
       
+      // 重置音频分片缓存
+      setAudioSegmentsCache({});
+      
       // 清理IndexedDB缓存
       try {
         await AudioCacheManager.cleanExpiredCache(0); // 清除所有缓存
@@ -1035,15 +1115,33 @@ const useChat = () => {
       // 添加用户消息
       addMessage('user', '🎤 [语音消息]');
       
+      // 记录发送到服务器的音频数据信息
+      console.log(`[AudioDebug] 发送到服务器的音频数据:`, {
+        数据长度: audioBase64.length,
+        前20个字符: audioBase64.substring(0, 20) + '...',
+        后20个字符: '...' + audioBase64.substring(audioBase64.length - 20),
+        发送时间: new Date().toISOString()
+      });
+      
+      // 确保格式正确（WAV或FLAC更适合STT服务）
+      // 在实际应用中，可能需要服务器端支持对应的格式
+      const requestData = {
+        audio_data: audioBase64,
+        speaker: speaker,
+        stream_audio: true,
+        audio_format: 'wav',  // 明确指定音频格式，确保服务器正确处理
+        audio_quality: 'high' // 向服务器暗示这是高质量音频
+      };
+      
       // 发送录音到服务器
       const response = await fetch(`${API_URL}/chat_audio`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          audio_data: audioBase64,
-          speaker: speaker,
-          stream_audio: true
-        })
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Audio-Format': 'wav', // 添加额外头信息
+          'X-Audio-Source': 'web-recorder' // 指明来源以帮助服务器决定处理方式
+        },
+        body: JSON.stringify(requestData)
       });
       
       if (!response.ok) {
@@ -1084,7 +1182,7 @@ const useChat = () => {
                 if (!data.message_id && assistantMessageId) {
                   data.message_id = assistantMessageId;
                 }
-                console.log('收到音频数据:', data.segment_index, '/', data.total_segments);
+                console.log('[AudioDebug] 收到音频数据:', data.segment_index, '/', data.total_segments);
                 handleAudioData(data);
                 break;
                 
@@ -1097,20 +1195,20 @@ const useChat = () => {
                 break;
                 
               default:
-                console.warn('收到未知类型的消息:', data);
+                console.warn('[AudioDebug] 收到未知类型的消息:', data);
             }
           } catch (error) {
-            console.error('解析响应数据失败:', error, line);
+            console.error('[AudioDebug] 解析响应数据失败:', error, line);
           }
         }
       }
     } catch (error) {
-      console.error('发送音频消息失败:', error);
+      console.error('[AudioDebug] 发送音频消息失败:', error);
       setError(`发送音频消息失败: ${error.message}`);
     } finally {
       setIsProcessing(false);
     }
-  }, [addMessage, handleAudioData, setIsProcessing]);
+  }, [addMessage, handleAudioData]);
 
   useEffect(() => {
     // 当消息列表清空时，清理音频缓存
@@ -1228,13 +1326,36 @@ const useChat = () => {
   }, []);
 
   // 添加调试函数
-  const debugAudioPlayback = useCallback((messageId) => {
+  const debugAudioPlayback = useCallback(async (messageId) => {
     console.log("== 音频播放调试信息 ==");
     console.log("当前消息ID:", messageId);
     console.log("PromisePlayer状态:", PromisePlayer.currentPlayback);
     console.log("该消息的音频分片:", PromisePlayer.segmentsByMessage[messageId]);
+    
+    // 显示音频段落缓存状态
+    console.log("音频段落缓存状态:", audioSegmentsCache[messageId] || "无缓存");
+    
+    // 从IndexedDB查询缓存状态
+    try {
+      if (AudioCacheManager) {
+        const cachedAudio = await AudioCacheManager.getAudio(messageId);
+        if (cachedAudio) {
+          console.log("IndexedDB缓存中的音频:", {
+            messageId: cachedAudio.messageId,
+            格式: cachedAudio.format,
+            数据长度: cachedAudio.audioData.length,
+            时间戳: new Date(cachedAudio.timestamp).toLocaleString()
+          });
+        } else {
+          console.log("IndexedDB缓存中无此消息音频");
+        }
+      }
+    } catch (err) {
+      console.error("查询IndexedDB缓存失败:", err);
+    }
+    
     console.log("======================");
-  }, []);
+  }, [audioSegmentsCache]);
 
   // 在 useChat.js 中添加 selectedSpeaker 状态
   const [selectedSpeaker, setSelectedSpeaker] = useState(loadSettings('selectedSpeaker', 'default'));

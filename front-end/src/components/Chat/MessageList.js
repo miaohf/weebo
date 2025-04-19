@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import Message from './Message';
-import { getMessageAudio } from '../../services/api';
+import { getMessageAudio, AudioCacheManager } from '../../services/api';
 import './MessageList.css';
 
 const MessageList = ({ onAudioData, ...props }) => {
@@ -11,6 +11,15 @@ const MessageList = ({ onAudioData, ...props }) => {
   const lastMessageIdRef = useRef(null);
   const receivedAudioRef = useRef(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
+
+  // 初始化AudioCacheManager
+  useEffect(() => {
+    if (AudioCacheManager && typeof AudioCacheManager.init === 'function') {
+      AudioCacheManager.init()
+        .then(() => console.log('[MessageList] 音频缓存系统初始化成功'))
+        .catch(err => console.error('[MessageList] 音频缓存系统初始化失败:', err));
+    }
+  }, []);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -131,7 +140,64 @@ const MessageList = ({ onAudioData, ...props }) => {
     }
 
     try {
-      if (message.has_audio && message.audio_data) {
+      // 首先尝试从缓存获取合并后的完整音频
+      let cachedAudio;
+      if (AudioCacheManager && typeof AudioCacheManager.getAudio === 'function') {
+        try {
+          console.log('[MessageList] 尝试从AudioCacheManager获取合并后的音频', messageId);
+          cachedAudio = await AudioCacheManager.getAudio(messageId);
+          console.log('[MessageList] 缓存查询结果:', {
+            找到缓存: !!cachedAudio,
+            音频数据长度: cachedAudio ? cachedAudio.audioData.length : 0,
+            格式: cachedAudio ? cachedAudio.format : 'unknown'
+          });
+        } catch (err) {
+          console.warn('[MessageList] 从缓存获取音频失败:', err);
+        }
+      }
+      
+      if (cachedAudio && cachedAudio.audioData) {
+        console.log('[MessageList] 使用缓存的合并音频数据播放', messageId);
+        
+        const audio = new Audio();
+        const format = cachedAudio.format || 'wav';
+        audio.src = `data:audio/${format};base64,${cachedAudio.audioData}`;
+        
+        // 设置播放状态标记
+        setIsPlaying(true);
+        setCurrentPlayingMessageId(messageId);
+        
+        audio.onplay = () => {
+          console.log(`[MessageList] 缓存音频开始播放: ${messageId}`);
+          setIsPlaying(true);
+          setCurrentPlayingAudio(audio);
+          setCurrentPlayingMessageId(messageId);
+        };
+        
+        audio.onended = () => {
+          console.log(`[MessageList] 缓存音频播放完成:`, messageId);
+          // 显式触发自定义事件，确保通知到所有组件
+          window.dispatchEvent(new CustomEvent('audio-playback-ended', {
+            detail: { messageId: messageId }
+          }));
+          cleanupAudio();
+        };
+        
+        audio.onerror = (e) => {
+          console.error('[MessageList] 缓存音频播放失败:', messageId, e);
+          cleanupAudio();
+        };
+        
+        try {
+          await audio.play();
+          console.log(`[MessageList] 缓存音频播放调用成功: ${messageId}`);
+        } catch (error) {
+          console.error(`[MessageList] 缓存音频播放调用失败: ${messageId}`, error);
+          cleanupAudio();
+        }
+      }
+      // 如果缓存中没有，但消息中有音频数据，则使用消息中的数据
+      else if (message.has_audio && message.audio_data) {
         console.log('[MessageList] 使用消息内嵌的音频数据播放', messageId);
         
         const audio = new Audio();
@@ -164,6 +230,7 @@ const MessageList = ({ onAudioData, ...props }) => {
         
         await audio.play();
       } 
+      // 如果以上都没有，则从API获取
       else {
         console.log('[MessageList] 获取消息音频数据:', messageId);
         let messageAudio = await getMessageAudio(messageId);

@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { FaMicrophone, FaKeyboard, FaImage } from 'react-icons/fa';
-import { BsArrowRightCircleFill, BsFillRecordCircleFill, BsFillRSquareFill } from "react-icons/bs";
+import { BsArrowRightCircleFill, BsFillRSquareFill } from "react-icons/bs";
 import './ChatInput.css';
 
 const ChatInput = ({ onSendMessage, isLoading, selectedSpeaker }) => {
@@ -95,86 +95,145 @@ const ChatInput = ({ onSendMessage, isLoading, selectedSpeaker }) => {
       
       console.log('===== 开始录音 =====');
       
+      // 优化麦克风设置，设置最佳参数以获得清晰音频
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
+          // 降噪处理
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
-          // 明确请求高质量音频
-          sampleRate: 44100,
-          channelCount: 1
+          
+          // 使用较高采样率以保持音频清晰度
+          sampleRate: 48000,
+          
+          // 使用单声道以减少数据量
+          channelCount: 1,
+          
+          // 设置较高的比特率
+          latency: 0.01,
+          
+          // 适合语音的设置
+          volume: 1.0
         } 
       });
       
-      console.log('获取到麦克风流:', stream);
+      console.log('[AudioDebug] 获取到麦克风流:', stream);
       const audioTracks = stream.getAudioTracks();
-      console.log('音频轨道:', audioTracks);
+      
+      // 获取并记录音频轨道的详细设置
+      if (audioTracks.length > 0) {
+        const track = audioTracks[0];
+        const settings = track.getSettings();
+        console.log('[AudioDebug] 音频轨道设置:', {
+          设备ID: settings.deviceId,
+          采样率: settings.sampleRate || '未知',
+          声道数: settings.channelCount || '未知',
+          自动增益: settings.autoGainControl || '未知',
+          回声消除: settings.echoCancellation || '未知',
+          噪声抑制: settings.noiseSuppression || '未知',
+          延迟: settings.latency || '未知'
+        });
+        
+        // 尝试应用额外的音轨约束
+        try {
+          track.applyConstraints({
+            noiseSuppression: true,
+            echoCancellation: true,
+            autoGainControl: true
+          }).then(() => {
+            console.log('[AudioDebug] 已应用额外音轨约束');
+          }).catch(err => {
+            console.warn('[AudioDebug] 无法应用额外音轨约束:', err);
+          });
+        } catch (err) {
+          console.warn('[AudioDebug] 音轨约束错误:', err);
+        }
+      } else {
+        console.warn('[AudioDebug] 未获取到音频轨道');
+      }
       
       if (audioTracks.length === 0) {
         throw new Error('没有获取到音频轨道，请检查麦克风设备');
       }
       
-      // 尝试最广泛支持的音频格式 - MP3更容易支持
+      // 优化录音格式 - 尽量使用WAV或FLAC，这些是最适合语音识别的无损格式
       let options = {};
       const mimeTypes = [
-        'audio/mp3',
-        'audio/mpeg',
-        'audio/webm',
-        'audio/ogg'
+        'audio/wav',     // 首选WAV格式（无损）
+        'audio/flac',    // 或FLAC（无损压缩）
+        'audio/webm',    // WebM通常使用较好的Opus编码
+        'audio/mp4',     // AAC编码，较好的兼容性
+        'audio/mpeg',    // MP3
+        'audio/ogg'      // OGG Vorbis/Opus
       ];
       
       // 查找浏览器支持的类型
+      let selectedMimeType = '';
       for (const type of mimeTypes) {
         if (MediaRecorder.isTypeSupported(type)) {
           options.mimeType = type;
-          console.log(`浏览器支持的录音MIME类型: ${type}`);
+          selectedMimeType = type;
+          console.log(`[AudioDebug] 选择使用MIME类型: ${type}`);
           break;
         }
       }
       
       try {
-        // 增加音频比特率，确保音质
-        options.audioBitsPerSecond = 128000;
+        // 使用最高比特率来确保音质
+        if (selectedMimeType) {
+          // 根据不同格式设置不同比特率
+          if (selectedMimeType.includes('wav') || selectedMimeType.includes('flac')) {
+            options.audioBitsPerSecond = 256000; // 无损格式使用更高比特率
+          } else {
+            options.audioBitsPerSecond = 128000; // 有损格式使用标准比特率
+          }
+        }
+        
         mediaRecorder.current = new MediaRecorder(stream, options);
-        console.log('MediaRecorder创建成功，使用MIME类型:', 
-          mediaRecorder.current.mimeType || '默认类型');
+        console.log('[AudioDebug] MediaRecorder创建成功，使用配置:', {
+          MIME类型: mediaRecorder.current.mimeType || '默认类型',
+          比特率: options.audioBitsPerSecond || '默认'
+        });
       } catch (e) {
-        console.warn('创建MediaRecorder失败，尝试使用默认配置:', e);
+        console.warn('[AudioDebug] 创建MediaRecorder失败，尝试使用默认配置:', e);
+        // 在失败时使用默认配置
         mediaRecorder.current = new MediaRecorder(stream);
+        console.log('[AudioDebug] 已回退到默认MediaRecorder配置');
       }
       
-      console.log('创建的MediaRecorder:', {
+      console.log('[AudioDebug] 最终创建的MediaRecorder:', {
         状态: mediaRecorder.current.state,
-        支持的类型: mediaRecorder.current.mimeType || '默认类型'
+        使用类型: mediaRecorder.current.mimeType || '默认类型',
+        比特率: mediaRecorder.current.audioBitsPerSecond || '默认'
       });
       
       audioChunks.current = [];
 
       // 确保ondataavailable在start()之前设置
       mediaRecorder.current.ondataavailable = (event) => {
-        console.log('录音数据可用:', event.data.size, 'bytes');
+        console.log('[AudioDebug] 录音数据块可用:', event.data.size, 'bytes');
         if (event.data.size > 0) {
           audioChunks.current.push(event.data);
-          console.log('当前已收集的音频块数量:', audioChunks.current.length);
+          console.log('[AudioDebug] 当前已收集的音频块数量:', audioChunks.current.length);
         } else {
-          console.warn('⚠️ 收到空的录音数据块');
+          console.warn('[AudioDebug] ⚠️ 收到空的录音数据块');
         }
       };
 
       mediaRecorder.current.onerror = (event) => {
-        console.error('MediaRecorder错误:', event.error);
+        console.error('[AudioDebug] MediaRecorder错误:', event.error);
       };
 
       mediaRecorder.current.onstop = () => {
-        console.log('录音停止，收集的音频块数量:', audioChunks.current.length);
+        console.log('[AudioDebug] 录音停止，收集的音频块数量:', audioChunks.current.length);
         
         if (audioChunks.current.length === 0) {
-          console.error('❌ 没有收集到任何音频数据!');
+          console.error('[AudioDebug] ❌ 没有收集到任何音频数据!');
           
           // 显示错误但继续尝试处理
           if (window.confirm('录音未捕获到数据。是否发送文本消息代替？')) {
             // 不再尝试发送测试音频，而是直接发送文本消息
-            console.log('使用文本消息代替语音消息');
+            console.log('[AudioDebug] 使用文本消息代替语音消息');
             
             // 通过onSendMessage发送一条文本消息
             const defaultMessage = "This is a voice message. ";
@@ -187,16 +246,20 @@ const ChatInput = ({ onSendMessage, isLoading, selectedSpeaker }) => {
         }
         
         // 根据使用的mimeType创建适当类型的Blob
-        const mimeType = mediaRecorder.current.mimeType || 'audio/mpeg';
-        console.log('使用MIME类型创建Blob:', mimeType);
+        const mimeType = mediaRecorder.current.mimeType || 'audio/wav';
+        console.log('[AudioDebug] 使用MIME类型创建Blob:', mimeType);
         
         const audioBlob = new Blob(audioChunks.current, { type: mimeType });
-        console.log('创建的音频Blob大小:', audioBlob.size, 'bytes, 类型:', audioBlob.type);
+        console.log('[AudioDebug] 创建的音频Blob:', {
+          大小: audioBlob.size,
+          类型: audioBlob.type,
+          块数: audioChunks.current.length
+        });
         
         if (audioBlob.size > 0) {
           sendAudioMessage(audioBlob);
         } else {
-          console.error('❌ 创建的audioBlob大小为0!');
+          console.error('[AudioDebug] ❌ 创建的audioBlob大小为0!');
           // 保留关键错误提示
           alert('录音失败: 生成的音频文件为空。请重试。');
         }
@@ -204,43 +267,43 @@ const ChatInput = ({ onSendMessage, isLoading, selectedSpeaker }) => {
         // 清理媒体流
         stream.getTracks().forEach(track => {
           track.stop();
-          console.log('已停止音频轨道:', track.label);
+          console.log('[AudioDebug] 已停止音频轨道:', track.label);
         });
       };
 
-      // 使用更小的时间片段，增加采集频率
-      mediaRecorder.current.start(200);
-      console.log('MediaRecorder已启动，状态:', mediaRecorder.current.state);
+      // 使用较小的时间片段收集数据，提高分辨率
+      mediaRecorder.current.start(100);
+      console.log('[AudioDebug] MediaRecorder已启动，状态:', mediaRecorder.current.state);
       setIsRecording(true);
       
-      // 每500ms主动请求一次数据，增加数据采集频率
+      // 每250ms主动请求一次数据，增加数据采集频率和精度
       let dataCollectionInterval = setInterval(() => {
         if (mediaRecorder.current && mediaRecorder.current.state === 'recording') {
           try {
             mediaRecorder.current.requestData();
-            console.log('主动请求录音数据');
+            console.log('[AudioDebug] 主动请求录音数据块');
           } catch (err) {
-            console.warn('请求数据失败:', err);
+            console.warn('[AudioDebug] 请求数据块失败:', err);
           }
         } else {
           clearInterval(dataCollectionInterval);
         }
-      }, 500);
+      }, 250);
       
-      // 设置最大录音时间（10秒，降低以便于测试）
+      // 设置最大录音时间（15秒，给用户充足时间）
       setTimeout(() => {
         clearInterval(dataCollectionInterval);
         if (mediaRecorder.current && mediaRecorder.current.state === 'recording') {
-          console.log('达到最大录音时间，自动停止');
+          console.log('[AudioDebug] 达到最大录音时间，自动停止');
           mediaRecorder.current.stop();
           setIsRecording(false);
           // 自动切换回文本输入模式
           setIsRecordMode(false);
         }
-      }, 10000);
+      }, 15000);
       
     } catch (error) {
-      console.error('❌ 访问麦克风失败:', error);
+      console.error('[AudioDebug] ❌ 访问麦克风失败:', error);
       // 保留关键错误提示
       alert(`无法访问麦克风: ${error.message}。请检查浏览器权限设置。`);
       // 出错时切换回文本模式
@@ -273,15 +336,16 @@ const ChatInput = ({ onSendMessage, isLoading, selectedSpeaker }) => {
 
   // 发送音频消息
   const sendAudioMessage = async (audioBlob) => {
-    console.log('=== 发送音频消息开始 ===');
-    console.log('收到的 audioBlob:', {
+    console.log('[AudioDebug] ===================');
+    console.log('[AudioDebug] === 发送音频消息开始 ===');
+    console.log('[AudioDebug] 收到的 audioBlob:', {
       大小: audioBlob.size,
       类型: audioBlob.type,
       是否为Blob: audioBlob instanceof Blob
     });
     
     if (!audioBlob || audioBlob.size <= 0) {
-      console.error('❌ 错误: 无效的音频数据 - 大小为0或空');
+      console.error('[AudioDebug] ❌ 错误: 无效的音频数据 - 大小为0或空');
       alert('无法处理语音: 录音数据为空。请重新尝试录音。');
       return;
     }
@@ -289,43 +353,106 @@ const ChatInput = ({ onSendMessage, isLoading, selectedSpeaker }) => {
     if (!isLoading) {
       try {
         // 提取MIME类型，确保有效
-        const mimeType = audioBlob.type || 'audio/mpeg';
+        const mimeType = audioBlob.type || 'audio/wav';
         
-        console.log(`使用MIME类型 ${mimeType} 处理音频数据`);
+        console.log(`[AudioDebug] 使用MIME类型 ${mimeType} 处理音频数据`);
+        
+        // 保存原始录音 - 便于调试
+        try {
+          const url = URL.createObjectURL(audioBlob);
+          console.log('[AudioDebug] 创建的临时音频URL:', url);
+          
+          // 创建一个隐藏的音频元素来检验录音质量
+          const audio = new Audio(url);
+          
+          // 添加播放和错误事件监听器
+          audio.onloadedmetadata = () => {
+            console.log('[AudioDebug] 加载的音频元数据:', {
+              时长: audio.duration.toFixed(2) + '秒',
+              音量: audio.volume,
+              当前时间: audio.currentTime,
+              是否就绪: audio.readyState,
+              是否暂停: audio.paused
+            });
+          };
+          
+          // 添加下载链接（调试时用）
+          // 注意：这段代码仅供调试，实际生产环境可以移除
+          if (false) { // 设置为true以启用下载功能进行调试
+            const downloadLink = document.createElement('a');
+            downloadLink.href = url;
+            downloadLink.download = `recording-${Date.now()}.${mimeType.split('/')[1] || 'wav'}`;
+            downloadLink.innerHTML = "下载录音";
+            downloadLink.style.display = "none";
+            document.body.appendChild(downloadLink);
+            //downloadLink.click(); // 自动下载
+            setTimeout(() => {
+              URL.revokeObjectURL(url);
+              document.body.removeChild(downloadLink);
+            }, 100);
+          }
+        } catch (err) {
+          console.warn('[AudioDebug] 无法创建音频预览:', err);
+        }
         
         // 直接使用blob对象发送，让API服务负责Base64编码
-        console.log('直接发送音频Blob，大小:', audioBlob.size, 'bytes');
+        console.log('[AudioDebug] 准备发送音频Blob，大小:', audioBlob.size, 'bytes');
         
         // 检查onSendMessage
         if (typeof onSendMessage !== 'function') {
-          console.error('❌ 错误: onSendMessage不是一个函数');
+          console.error('[AudioDebug] ❌ 错误: onSendMessage不是一个函数');
           alert('内部错误: 无法发送消息。请刷新页面后重试。');
           return;
         }
         
+        // 验证AudioBlob
+        if (audioBlob.size < 100) {
+          console.warn('[AudioDebug] ⚠️ 警告: 音频文件非常小，可能录制失败');
+        }
+        
+        // 创建一个新的音频Blob，确保类型正确
+        // 这有助于修复可能的格式问题
+        let optimizedBlob;
+        try {
+          // 优先使用WAV格式，因为STT服务器可能对其处理更好
+          optimizedBlob = new Blob([audioBlob], { 
+            type: 'audio/wav'
+          });
+          console.log('[AudioDebug] 创建了优化的音频Blob，使用WAV格式');
+        } catch (err) {
+          console.warn('[AudioDebug] 无法创建优化Blob，使用原始Blob:', err);
+          optimizedBlob = audioBlob;
+        }
+        
         // 记录传给onSendMessage的参数
-        console.log('调用onSendMessage，参数:', {
+        console.log('[AudioDebug] 调用onSendMessage，参数:', {
           消息: '',
-          文件数组: [audioBlob],  // 直接传递audioBlob，不再创建File对象
+          文件数组: [optimizedBlob],
           消息类型: 'voice',
           发言人: selectedSpeaker,
           流式音频: true
         });
         
         // 显式传递第五个参数true，表示streamAudio
-        onSendMessage('', [audioBlob], 'voice', selectedSpeaker, true);
+        onSendMessage('', [optimizedBlob], 'voice', selectedSpeaker, true);
         
         // 打印日志，确认文件已添加到请求中
-        console.log('✅ 发送语音消息完成，音频大小:', audioBlob.size, 'bytes, 类型:', audioBlob.type);
+        console.log('[AudioDebug] ✅ 发送语音消息完成', {
+          原始大小: audioBlob.size,
+          优化后大小: optimizedBlob.size,
+          类型: optimizedBlob.type,
+          发送时间: new Date().toISOString()
+        });
       } catch (error) {
-        console.error('❌ 发送音频消息时出错:', error);
+        console.error('[AudioDebug] ❌ 发送音频消息时出错:', error);
         alert(`发送音频消息失败: ${error.message}`);
       }
     } else {
-      console.warn('⚠️ 当前正在加载中，忽略音频消息');
+      console.warn('[AudioDebug] ⚠️ 当前正在加载中，忽略音频消息');
       alert('系统正在处理上一条消息，请稍后再试。');
     }
-    console.log('=== 发送音频消息结束 ===');
+    console.log('[AudioDebug] === 发送音频消息结束 ===');
+    console.log('[AudioDebug] ===================');
   };
 
   return (

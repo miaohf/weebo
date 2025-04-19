@@ -11,6 +11,7 @@ from services.assistant import Assistant
 from services.message_processor import MessageProcessorFactory
 from api.dependencies import get_assistant
 from utils.logging_utils import debug, info, error
+from core.config import settings
 
 # 创建路由器
 router = APIRouter(tags=["聊天"])
@@ -80,9 +81,9 @@ async def unified_chat(
                     hex_header = ' '.join([f"{b:02X}" for b in audio_data[:16]])
                     debug(f"音频数据头16字节(HEX): {hex_header}")
                 
-                # 保存到临时文件
-                temp_dir = "/tmp/weebo_debug"
-                os.makedirs(temp_dir, exist_ok=True)
+                # 保存到用户音频目录
+                user_audio_dir = os.path.join(settings.AUDIO_STORAGE_DIR, "user")
+                os.makedirs(user_audio_dir, exist_ok=True)
                 timestamp = int(time.time())
                 # 处理MIME类型
                 mime_type = json_data.get('audio_mime_type', 'audio/webm')
@@ -91,7 +92,7 @@ async def unified_chat(
                 if ';' in extension:
                     extension = extension.split(';')[0]
                 
-                temp_file_path = f"{temp_dir}/voice_input_{timestamp}.{extension}"
+                temp_file_path = f"{user_audio_dir}/voice_input_{timestamp}.{extension}"
                 with open(temp_file_path, "wb") as f:
                     f.write(audio_data)
                 debug(f"已保存音频数据到: {temp_file_path}")

@@ -2,7 +2,7 @@ import axios from 'axios';
 import { API_URL } from '../config';
 
 // 本地音频缓存管理器
-const AudioCacheManager = {
+export const AudioCacheManager = {
   DB_NAME: 'audioCache',
   STORE_NAME: 'audioData',
   db: null,

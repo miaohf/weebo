@@ -11,6 +11,8 @@ import wave
 from pydub import AudioSegment
 import soundfile as sf
 import re
+import time
+import tempfile
 
 from models.request_models import UnifiedChatRequest
 from utils.logging_utils import debug, info, error, user_message, assistant_message
@@ -213,12 +215,13 @@ class TextMessageProcessor(BaseMessageProcessor):
                         error(f"处理音频段落{i}时出错: {e}")
                         # 继续处理下一个段落，不中断
                 
+                assistant_audio_dir = os.path.join(settings.AUDIO_STORAGE_DIR, "assistant")
                 # 在后台任务中合并音频段落
                 background_tasks.add_task(
                     self.assistant.merge_audio_segments,
                     assistant_message_id,
                     audio_paths,
-                    settings.AUDIO_STORAGE_DIR
+                    assistant_audio_dir
                 )
             
             # 返回流式响应
@@ -241,115 +244,145 @@ class VoiceMessageProcessor(BaseMessageProcessor):
     """语音消息处理器"""
     async def process(self, request: UnifiedChatRequest, background_tasks: BackgroundTasks):
         """处理语音消息"""
-        try:
-            # 获取上传的语音文件
-            if not request.files or len(request.files) == 0:
-                return JSONResponse(
-                    status_code=400,
-                    content={"error": "请求中不包含语音文件", "status": "error"}
-                )
-                
-            audio_file = request.files[0]
-            speaker = request.speaker
-            stream_audio = request.stream_audio
-            
-            # 详细记录音频文件信息
-            print(f"收到语音文件: {audio_file.filename}, 类型: {audio_file.content_type}")
-            print(f"文件细节: 名称={audio_file.filename}, 内容类型={audio_file.content_type}")
-            
-            # 读取音频数据
-            audio_data = await audio_file.read()
-            file_size = len(audio_data) if audio_data else 0
-            print(f"读取到的音频数据大小: {file_size} 字节")
-            
-            # 检查文件大小，过小的文件可能是测试数据或无效的
-            if file_size == 0:
-                return JSONResponse(
-                    status_code=400,
-                    content={"error": "音频文件为空", "status": "error"}
-                )
-            elif file_size < 1000:  # 如果文件小于1KB，但不为0
-                print(f"警告: 音频文件过小 ({file_size} 字节)，可能是测试数据")
-                # 对于小型测试音频文件，直接使用测试响应
-                transcript = "这是一条测试消息。我已收到您的语音输入。可以继续对话。"
-                print(f"使用测试响应: {transcript}")
-            elif file_size < 10000:  # 如果文件小于10KB，可能是短语音或测试数据
-                # 尝试转录，但可能失败
-                print(f"警告: 音频文件较小 ({file_size} 字节)，尝试转录但可能不准确")
-                try:
-                    # 保存音频数据到临时文件，便于调试
-                    temp_file_path = f"/tmp/audio_input_{hash(audio_file.filename)}_{file_size}.bin"
-                    with open(temp_file_path, "wb") as f:
-                        f.write(audio_data)
-                    print(f"已保存音频数据到临时文件: {temp_file_path}")
-                    
-                    transcript = await self.assistant.transcribe_audio(audio_data)
-                    if not transcript:
-                        transcript = "我收到了您的短语音消息，请问您有什么需要帮助的？"
-                        print(f"转录失败，使用备用响应: {transcript}")
-                    else:
-                        print(f"成功转录短语音: {transcript}")
-                except Exception as e:
-                    print(f"转录短语音时出错: {e}")
-                    transcript = "我收到了您的短语音，但无法识别内容。请您说得清晰一些或使用文本输入。"
-            else:
-                # 正常处理音频转录
-                print(f"开始转录音频，数据大小: {file_size} 字节")
-                # 保存音频数据到临时文件，便于调试
-                temp_file_path = f"/tmp/audio_input_{hash(audio_file.filename)}_{file_size}.bin"
-                with open(temp_file_path, "wb") as f:
-                    f.write(audio_data)
-                print(f"已保存音频数据到临时文件: {temp_file_path}")
-                
-                try:
-                    transcript = await self.assistant.transcribe_audio(audio_data)
-                    
-                    if not transcript:
-                        print("语音转录失败: 未检测到语音内容")
-                        return JSONResponse(
-                            status_code=400,
-                            content={"error": "未检测到语音内容或转录失败", "status": "error"}
-                        )
-                    
-                    print(f"语音转录成功: {transcript}")
-                except Exception as e:
-                    print(f"转录音频时出错: {e}")
-                    # 如果转录失败但我们确定有音频数据，使用后备响应
-                    transcript = "我收到了您的语音消息，但无法转录内容。请问您能以文本形式重新发送您的问题吗？"
-                    print(f"使用后备响应: {transcript}")
-            
-            # 记录用户语音转文本的消息
-            self.print_user_message(f"[voice] {transcript}")
-            
-            # 保存用户消息
-            self.assistant.db_service.save_message("user", {
-                "type": "voice",
-                "text": transcript
-            })
-            
-            # 现在使用文本处理器处理转录后的文本
-            text_request = UnifiedChatRequest(
-                message_type="text",
-                message=transcript,
-                session_id=request.session_id,
-                speaker=speaker,
-                stream_audio=stream_audio
+        start_time = time.time()
+        info(f"开始处理语音消息")
+        
+        # 获取第一个音频文件
+        if not request.files or len(request.files) == 0:
+            error("未提供音频文件")
+            return JSONResponse(
+                status_code=400,
+                content={"error": "未提供音频文件", "status": "error"}
             )
+        
+        # 获取音频文件
+        audio_file = request.files[0]
+        speaker = request.speaker
+        stream_audio = request.stream_audio
+        info(f"接收到音频文件: {audio_file.filename}, 类型: {audio_file.content_type}")
+        
+        # 读取音频数据
+        try:
+            audio_data = await audio_file.read()
+            file_size = len(audio_data)
+            info(f"成功读取音频数据, 大小: {file_size} 字节")
             
-            # 使用文本处理器处理后续流程
-            text_processor = TextMessageProcessor(self.assistant)
-            return await text_processor.process(text_request, background_tasks)
+            # WebM音频文件需要特殊处理
+            if audio_file.content_type and 'webm' in audio_file.content_type.lower():
+                # 转换为临时WAV文件
+                temp_wav_file = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
+                temp_webm_file = tempfile.NamedTemporaryFile(delete=False, suffix='.webm')
+                
+                try:
+                    # 保存WebM文件
+                    with open(temp_webm_file.name, 'wb') as f:
+                        f.write(audio_data)
+                    
+                    # 使用FFmpeg转换
+                    info(f"使用FFmpeg转换WebM到WAV...")
+                    import subprocess
+                    cmd = [
+                        'ffmpeg', '-y', '-i', temp_webm_file.name,
+                        '-acodec', 'pcm_s16le',
+                        '-ar', '16000',
+                        '-ac', '1',
+                        # 添加噪声滤波器
+                        '-af', 'highpass=f=80,lowpass=f=8000,areverse,silenceremove=start_periods=1:start_silence=0.1:start_threshold=-50dB,areverse',
+                        temp_wav_file.name
+                    ]
+                    
+                    result = subprocess.run(cmd, capture_output=True, text=True)
+                    
+                    if result.returncode != 0:
+                        error(f"FFmpeg转换失败: {result.stderr}")
+                        raise Exception("FFmpeg转换失败")
+                    
+                    # 读取转换后的WAV文件
+                    with open(temp_wav_file.name, 'rb') as f:
+                        audio_data = f.read()
+                    
+                    info(f"WebM到WAV转换成功, 新大小: {len(audio_data)} 字节")
+                    
+                except Exception as e:
+                    error(f"WebM音频转换失败: {e}")
+                    # 继续使用原始数据
+                finally:
+                    # 清理临时文件
+                    try:
+                        os.unlink(temp_webm_file.name)
+                        os.unlink(temp_wav_file.name)
+                    except:
+                        pass
             
+            # 如果数据太小，可能是无效音频
+            if file_size < 100:
+                error(f"音频数据太小: {file_size} 字节, 可能不是有效的音频文件")
+                return JSONResponse(
+                    status_code=400,
+                    content={"error": "音频数据无效或太小", "status": "error"}
+                )
+                
         except Exception as e:
-            import traceback
-            error_trace = traceback.format_exc()
-            print(f"处理语音消息时出错: {e}")
-            print(error_trace)
-            
+            error(f"读取音频数据失败: {e}")
             return JSONResponse(
                 status_code=500,
-                content={"error": f"处理语音消息失败: {str(e)}", "status": "error"}
+                content={"error": "读取音频数据失败", "status": "error"}
             )
+        
+        # 这里可以添加更多的音频检查和处理逻辑
+        
+        # 如果是调试环境，处理样例请求
+        if settings.DEV_MODE and audio_file.filename == 'test.wav':
+            info("检测到测试音频文件，使用预设转录")
+            transcript = "这是一个测试语音信息，请问您今天过得怎么样？"
+            
+        else:
+            # 正常处理音频转录
+            print(f"开始转录音频，数据大小: {file_size} 字节")
+            # 保存音频数据到临时文件，便于调试
+            temp_file_path = f"/tmp/audio_input_{hash(audio_file.filename)}_{file_size}.bin"
+            with open(temp_file_path, "wb") as f:
+                f.write(audio_data)
+            print(f"已保存音频数据到临时文件: {temp_file_path}")
+            
+            try:
+                transcript = await self.assistant.transcribe_audio(audio_data)
+                
+                if not transcript:
+                    print("语音转录失败: 未检测到语音内容")
+                    return JSONResponse(
+                        status_code=400,
+                        content={"error": "未检测到语音内容或转录失败", "status": "error"}
+                    )
+                
+                print(f"语音转录成功: {transcript}")
+            except Exception as e:
+                print(f"转录音频时出错: {e}")
+                # 如果转录失败但我们确定有音频数据，使用后备响应
+                transcript = "我收到了您的语音消息，但无法转录内容。请问您能以文本形式重新发送您的问题吗？"
+                print(f"使用后备响应: {transcript}")
+        
+        # 记录用户语音转文本的消息
+        self.print_user_message(f"[voice] {transcript}")
+        
+        # 保存用户消息
+        self.assistant.db_service.save_message("user", {
+            "type": "voice",
+            "text": transcript
+        })
+        
+        # 现在使用文本处理器处理转录后的文本
+        text_request = UnifiedChatRequest(
+            message_type="text",
+            message=transcript,
+            session_id=request.session_id,
+            speaker=speaker,
+            stream_audio=stream_audio
+        )
+        
+        # 使用文本处理器处理后续流程
+        text_processor = TextMessageProcessor(self.assistant)
+        return await text_processor.process(text_request, background_tasks)
 
 class ImageMessageProcessor(BaseMessageProcessor):
     """图像消息处理器"""
