@@ -76,7 +76,7 @@
   --button-hover: #e0e0e0;
   --button-text: #333333;
   --loading-dot: #4a90e2;
-  --shadow-color: rgba(0, 0, 0, 0.1);
+  --shadow-color: rgba(0, 0, 0, 0.05);
 }
 
 /* 暗黑模式 */
@@ -100,8 +100,8 @@
   --input-bg: #2d2d2d;
   --input-border: #3d3d3d;
   --input-text: #e2e8f0;
-  --user-bubble: linear-gradient(135deg, #473b20, #473b20);
-  --assistant-bubble: linear-gradient(135deg, #2b3a3b, #2b3a3b);
+  --user-bubble: linear-gradient(135deg, #443a23, #443a23);
+  --assistant-bubble: linear-gradient(135deg, #2b3435, #2b3435);
   --button-bg: #2d2d2d;
   --button-hover: #3d3d3d;
   --button-text: #e2e8f0;

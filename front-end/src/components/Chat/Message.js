@@ -232,11 +232,11 @@ const Message = ({ message, showChinese, onPlayAudio, onReplayAudio, isPlaying: 
   if (isUserAudio) {
     displayContent = (
       <div className="voice-message">
-        <div className="voice-message-icon">
-          <FaMicrophone />
-        </div>
+          {/* <div className="voice-message-icon">
+            <FaMicrophone />
+          </div> */}
         <span className="voice-message-text">
-          {original || '语音消息'}
+          {original || 'Voice Message'}
         </span>
         <span className="audio-button-wrapper">{renderAudioButton()}</span>
       </div>

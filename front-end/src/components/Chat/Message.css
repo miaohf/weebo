@@ -338,9 +338,9 @@
 .voice-message {
   display: flex;
   align-items: center;
-  background-color: rgba(0, 0, 0, 0.05);
+  /* background-color: rgba(0, 0, 0, 0.05); */
   border-radius: 18px;
-  padding: 8px 12px;
+  /* padding: 8px 12px; */
   max-width: 260px;
 }
 
@@ -364,17 +364,17 @@
   flex: 1;
 }
 
-.user .voice-message {
+/* .user .voice-message {
   background-color: rgba(255, 255, 255, 0.2);
-}
+} */
 
-.user .voice-message-text {
+/* .user .voice-message-text {
   color: rgba(255, 255, 255, 0.9);
 }
 
 .user .voice-message-icon {
   color: rgba(255, 255, 255, 0.9);
-}
+} */
 
 .message-translated {
   font-size: 14px;
