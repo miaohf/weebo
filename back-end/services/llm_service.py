@@ -230,7 +230,11 @@ class LLMService:
                 last_user_message = user_messages[-1]["content"]
                 language = self._detect_language(last_user_message)
                 if language == 'chinese':
-                    chat_history[0]["content"] += "\n请用中文回复这个问题。"
+                    add_prompt = {
+                        "role": "system",
+                        "content": "请用中文回复这个问题。"
+                    }
+                    chat_history.append(add_prompt)
         
         llm_response = self._make_api_request(chat_history)
         
