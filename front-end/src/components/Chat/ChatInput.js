@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { FaMicrophone, FaKeyboard, FaImage } from 'react-icons/fa';
-import { BsArrowRightCircleFill, BsFillRSquareFill } from "react-icons/bs";
+import { BsArrowRightCircleFill, BsFillStopCircleFill } from "react-icons/bs";
 import './ChatInput.css';
 
 const ChatInput = ({ onSendMessage, isLoading, selectedSpeaker }) => {
@@ -447,10 +447,8 @@ const ChatInput = ({ onSendMessage, isLoading, selectedSpeaker }) => {
         )}
         
         {/* 录音状态提示 */}
-        {isRecordMode && isRecording && (
+        {/* {isRecordMode && isRecording && (
           <div className="recording-status">
-            <span className="recording-indicator"></span>
-            正在录音中...已录制 {audioChunks.current.length} 个音频片段
             {audioChunks.current.length > 0 && (
               <span className="recording-size">
                 (总大小: {
@@ -462,7 +460,7 @@ const ChatInput = ({ onSendMessage, isLoading, selectedSpeaker }) => {
               </span>
             )}
           </div>
-        )}
+        )} */}
         
         <div className="chat-input-controls">
           {/* 切换录音/键盘模式按钮 - 仅在非录音状态显示麦克风图标，在录音状态显示键盘图标 */}
@@ -482,8 +480,7 @@ const ChatInput = ({ onSendMessage, isLoading, selectedSpeaker }) => {
               onClick={stopRecording}
               disabled={isLoading || !isRecording}
             >
-              <BsFillRSquareFill />
-              <span className="record-button-text">{isRecording ? '停止录音' : '正在准备...'}</span>
+              <BsFillStopCircleFill className="stop-icon" style={{ fontSize: '24px' }} />
             </button>
           ) : (
             <>

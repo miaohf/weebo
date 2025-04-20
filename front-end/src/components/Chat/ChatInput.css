@@ -145,10 +145,10 @@
 }
 
 .record-button.recording {
-  background-color: rgba(255, 0, 0, 0.1);
-  border-color: #ff4d4f;
+  background-color: rgba(107, 98, 98, 0.1);
+  /* border-color: #ff4d4f; */
   color: #ff4d4f;
-  animation: pulse 1.5s infinite;
+  /* animation: pulse 1.5s infinite; */
 }
 
 /* 图片预览样式 */
