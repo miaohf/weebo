@@ -99,38 +99,46 @@ class LLMService:
         """Remove emojis and other problematic characters for TTS"""
         if not text:
             return text
+        
+        try:
+            # 直接删除特定表情符号，这些是最常见的
+            specific_emojis = [
+                '\U0001f60a',  # 😊 笑脸表情
+                '\U0001f600',  # 😀
+                '\U0001f603',  # 😃
+                '\U0001f604',  # 😄
+                '\U0001f601',  # 😁
+                '\U0001f606',  # 😆
+                '\U0001f605',  # 😅
+                '\U0001f602',  # 😂
+                '\U0001f642',  # 🙂
+            ]
             
-        # Pattern to match emoji and other Unicode symbols
-        # 注意：这个正则表达式只匹配Unicode表情符号，不会影响中文字符(U+4E00至U+9FFF)和中文标点符号
-        emoji_pattern = re.compile(
-            "["
-            "\U0001F600-\U0001F64F"  # emoticons
-            "\U0001F300-\U0001F5FF"  # symbols & pictographs
-            "\U0001F680-\U0001F6FF"  # transport & map symbols
-            "\U0001F700-\U0001F77F"  # alchemical symbols
-            "\U0001F780-\U0001F7FF"  # Geometric Shapes
-            "\U0001F800-\U0001F8FF"  # Supplemental Arrows-C
-            "\U0001F900-\U0001F9FF"  # Supplemental Symbols and Pictographs
-            "\U0001FA00-\U0001FA6F"  # Chess Symbols
-            "\U0001FA70-\U0001FAFF"  # Symbols and Pictographs Extended-A
-            "\U00002702-\U000027B0"  # Dingbats
-            "\U000024C2-\U0001F251" 
-            "]+", flags=re.UNICODE)
-        
-        # 替换表情符号为文本描述，而不是删除
-        text = emoji_pattern.sub(r'[表情]', text)
-        
-        # 替换ASCII表情符号
-        text = re.sub(r':\)', '[笑脸]', text)
-        text = re.sub(r':\(', '[悲伤脸]', text)
-        text = re.sub(r':D', '[大笑脸]', text)
-        text = re.sub(r':P', '[吐舌头脸]', text)
-        text = re.sub(r':/', '[困惑脸]', text)
-        text = re.sub(r';\)', '[眨眼脸]', text)
-        text = re.sub(r'\^_\^', '[开心脸]', text)
-        text = re.sub(r'<3', '[爱心]', text)
-        
-        return text.strip()
+            result = text
+            for emoji in specific_emojis:
+                result = result.replace(emoji, '')
+            
+            # 删除ASCII表情符号
+            result = re.sub(r':\)', '', result)
+            result = re.sub(r':\(', '', result)
+            result = re.sub(r':D', '', result)
+            result = re.sub(r':P', '', result)
+            result = re.sub(r':/', '', result)
+            result = re.sub(r';\)', '', result)
+            result = re.sub(r'\^_\^', '', result)
+            result = re.sub(r'<3', '', result)
+            
+            # 输出调试信息
+            debug(f"原始文本: '{text}'")
+            debug(f"处理后文本: '{result}'")
+            
+            return result.strip()
+            
+        except Exception as e:
+            error(f"Error sanitizing text: {e}")
+            # 如果处理出错，返回原始文本
+            return text.strip()
+
 
     def _detect_language(self, text):
         """检测文本的主要语言
@@ -188,7 +196,11 @@ class LLMService:
         
         try:
             # 获取LLM响应
-            original_response = self._get_llm_response()
+            llm_response = self._get_llm_response()
+            debug(f"LLM response: {llm_response}")
+
+            original_response = self._sanitize_for_tts(llm_response)
+            debug(f"Sanitized response: {original_response}")
             
             if not original_response:
                 error("Empty LLM response")
