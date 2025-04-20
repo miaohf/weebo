@@ -24,13 +24,10 @@ const ChatContainer = ({
   
   // 加一个包装函数确保参数传递正确
   const handleSendMessage = (message, files, messageType, speaker, streamAudio = true) => {
-    console.log("handleSendMessage called with:", { message, files, messageType, speaker, streamAudio });
-    
-    // 检查和记录文件信息
+    // 检查文件信息
     if (files && files.length > 0) {
-      files.forEach((file, index) => {
-        console.log(`文件 ${index}: ${file.name}, 大小: ${file.size} bytes, 类型: ${file.type}`);
-      });
+      // 仅在控制台显示文件基本信息，不需要详细日志
+      console.log(`接收到${files.length}个文件，类型：${messageType}`);
     } else if (messageType === 'voice') {
       console.error("警告: 语音消息但没有文件!");
     }

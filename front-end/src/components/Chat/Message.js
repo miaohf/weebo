@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaVolumeUp, FaMicrophone, FaPlay, FaPause } from 'react-icons/fa';
+import { FaPlay, FaPause } from 'react-icons/fa';
 import ChatBubble from '../ChatBubble';
 import './Message.css';
 
@@ -23,21 +23,8 @@ const Message = ({ message, showChinese, onPlayAudio, onReplayAudio, isPlaying: 
     // 添加音频播放完成事件监听器
     const handleAudioEnded = (event) => {
       // 检查事件是否包含详细信息
-      const detail = event.detail || {};
-      const eventMessageId = detail.messageId;
-      
-      console.log(`[${message_id}] 收到音频播放完成事件:`, { 
-        eventMessageId,
-        currentMessageId: message_id,
-        localIsPlaying,
-        propIsPlaying
-      });
-      
-      // 如果事件包含消息ID且与当前消息不匹配，则跳过
-      if (eventMessageId && eventMessageId !== message_id) {
-        console.log(`[${message_id}] 跳过其他消息的播放完成事件`);
-        return;
-      }
+      // const detail = event.detail || {};
+      // const eventMessageId = detail.messageId;
       
       // 不管当前状态如何，都尝试重置播放状态
       if (localIsPlaying) {
@@ -52,7 +39,6 @@ const Message = ({ message, showChinese, onPlayAudio, onReplayAudio, isPlaying: 
     // 也可以监听全局播放状态变化
     const handlePlayingChange = () => {
       if (propIsPlaying === false && localIsPlaying === true) {
-        console.log(`[${message_id}] 根据props更新播放状态`);
         setLocalIsPlaying(false);
       }
     };
@@ -71,45 +57,22 @@ const Message = ({ message, showChinese, onPlayAudio, onReplayAudio, isPlaying: 
     // 只有在本地状态为播放中时才需要检查
     if (!localIsPlaying) return;
     
-    console.log(`[${message_id}] 启动播放状态检查定时器`);
-    
     // 每500毫秒检查一次播放状态
     const intervalId = setInterval(() => {
       // 如果父组件已经标记为非播放状态，则重置本地状态
       if (propIsPlaying === false && localIsPlaying === true) {
-        console.log(`[${message_id}] 定时器检查: 父组件已停止播放，重置本地状态`);
         setLocalIsPlaying(false);
       }
     }, 500);
     
     return () => {
-      console.log(`[${message_id}] 清理播放状态检查定时器`);
       clearInterval(intervalId);
     };
   }, [localIsPlaying, propIsPlaying, message_id]);
   
-  // 添加详细调试日志
-  console.log(`Message [${message_id}] 渲染详情:`, { 
-    role, 
-    hasAudio: has_audio,
-    messageType: message_type,
-    propIsPlaying,
-    localIsPlaying,
-    isPlaying
-  });
-  
   const handleReplay = async () => {
-    console.log(`[${message_id}] 点击音频按钮:`, {
-      isPlaying: isPlaying,
-      propIsPlaying: propIsPlaying,
-      localIsPlaying: localIsPlaying,
-      hasReplayCallback: typeof onReplayAudio === 'function',
-      hasPlayCallback: typeof onPlayAudio === 'function'
-    });
-    
     // 如果正在播放，点击应该停止播放
     if (isPlaying) {
-      console.log(`[${message_id}] 停止播放音频`);
       // 如果是本地控制的播放状态，则直接停止
       if (localIsPlaying) {
         setLocalIsPlaying(false);
@@ -126,7 +89,6 @@ const Message = ({ message, showChinese, onPlayAudio, onReplayAudio, isPlaying: 
       
       // 首先尝试使用 onReplayAudio
       if (typeof onReplayAudio === 'function') {
-        console.log(`[${message_id}] 使用onReplayAudio开始播放`);
         // 只有在父组件还没有设置播放状态时，才设置本地状态
         if (!propIsPlaying) {
           setLocalIsPlaying(true);
@@ -135,7 +97,6 @@ const Message = ({ message, showChinese, onPlayAudio, onReplayAudio, isPlaying: 
       } 
       // 如果没有 onReplayAudio，则尝试使用 onPlayAudio
       else if (typeof onPlayAudio === 'function' && message_id) {
-        console.log(`[${message_id}] 使用onPlayAudio开始播放`);
         // 只有在父组件还没有设置播放状态时，才设置本地状态
         if (!propIsPlaying) {
           setLocalIsPlaying(true);
@@ -192,15 +153,6 @@ const Message = ({ message, showChinese, onPlayAudio, onReplayAudio, isPlaying: 
   // 渲染音频控件
   const renderAudioButton = () => {
     const actuallyPlaying = isPlaying === true;
-    
-    // 调试图标显示
-    console.log(`[${message_id}] 渲染音频按钮:`, {
-      isPlaying: isPlaying,
-      propIsPlaying,
-      localIsPlaying,
-      shouldShowPauseIcon: actuallyPlaying,
-      shouldShowPlayIcon: !actuallyPlaying
-    });
     
     if ((isAssistant && status !== 'loading' && isAudioComplete) || isUserAudio) {
       const buttonIcon = isLoading ? (

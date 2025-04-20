@@ -6,10 +6,14 @@ export const AudioCacheManager = {
   DB_NAME: 'audioCache',
   STORE_NAME: 'audioData',
   db: null,
+  isInitialized: false, // 添加初始化标志
 
   // 初始化数据库
   async init() {
-    if (this.db) return this.db;
+    // 如果已经初始化过，直接返回已有的数据库连接
+    if (this.isInitialized && this.db) {
+      return this.db;
+    }
 
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(this.DB_NAME, 1);
@@ -23,12 +27,13 @@ export const AudioCacheManager = {
       
       request.onsuccess = (event) => {
         this.db = event.target.result;
-        console.log('API层音频缓存数据库初始化成功');
+        this.isInitialized = true; // 标记为已初始化
+        //console.log('API层音频缓存数据库初始化成功');
         resolve(this.db);
       };
       
       request.onerror = (event) => {
-        console.error('API层音频缓存数据库初始化失败:', event.target.error);
+        console.error('音频缓存数据库初始化失败:', event.target.error);
         reject(event.target.error);
       };
     });
@@ -50,12 +55,11 @@ export const AudioCacheManager = {
       });
       
       request.onsuccess = () => {
-        console.log(`API层音频缓存成功: ${messageId}`);
         resolve(true);
       };
       
       request.onerror = (event) => {
-        console.error(`API层音频缓存失败: ${messageId}`, event.target.error);
+        console.error(`音频缓存失败: ${messageId}`, event.target.error);
         reject(event.target.error);
       };
     });
@@ -74,24 +78,70 @@ export const AudioCacheManager = {
       request.onsuccess = (event) => {
         const result = event.target.result;
         if (result) {
-          console.log(`API层从缓存读取音频: ${messageId}`);
           resolve(result);
         } else {
-          console.log(`API层缓存中无此音频: ${messageId}`);
           resolve(null);
         }
       };
       
       request.onerror = (event) => {
-        console.error(`API层读取缓存音频失败: ${messageId}`, event.target.error);
+        console.error(`读取缓存音频失败: ${messageId}`, event.target.error);
         reject(event.target.error);
+      };
+    });
+  },
+  
+  // 清理过期缓存
+  async cleanExpiredCache(maxAge = 7 * 24 * 60 * 60 * 1000) { // 默认7天过期
+    if (!this.db) await this.init();
+    
+    const now = Date.now();
+    const transaction = this.db.transaction([this.STORE_NAME], 'readwrite');
+    const store = transaction.objectStore(this.STORE_NAME);
+    
+    return new Promise((resolve) => {
+      const request = store.openCursor();
+      let deletedCount = 0;
+      
+      request.onsuccess = (event) => {
+        const cursor = event.target.result;
+        if (cursor) {
+          const data = cursor.value;
+          if (now - data.timestamp > maxAge) {
+            store.delete(cursor.key);
+            deletedCount++;
+          }
+          cursor.continue();
+        } else {
+          resolve(deletedCount);
+        }
       };
     });
   }
 };
 
-// 初始化缓存
-AudioCacheManager.init().catch(err => console.error('初始化API层音频缓存失败:', err));
+// 初始化缓存 - 应用启动时执行一次初始化
+AudioCacheManager.init().catch(err => console.error('初始化音频缓存失败:', err));
+
+// 定期清理缓存 - 只有在数据库已初始化的情况下才执行清理
+const cleanupInterval = setInterval(() => {
+  if (AudioCacheManager.isInitialized) {
+    AudioCacheManager.cleanExpiredCache()
+      .then(count => {
+        //if (count > 0) {
+        //  console.log(`API层定期清理: 删除了 ${count} 条过期音频缓存`);
+        //}
+      })
+      .catch(err => console.error('清理缓存失败:', err));
+  }
+}, 24 * 60 * 60 * 1000); // 24小时清理一次
+
+// 确保在应用关闭时清理定时器
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', () => {
+    clearInterval(cleanupInterval);
+  });
+}
 
 // 获取消息历史
 export const fetchChatHistory = async () => {
@@ -167,15 +217,6 @@ export const sendChatMessage = async (message, files = [], messageType = 'text',
  */
 export const sendChatMessageStreaming = async (message, files = [], messageType = 'text', speaker = 'default', onChunk, streamAudio = true) => {
   try {
-    // 详细记录入参信息
-    console.log('======= 发送聊天消息流 =======');
-    console.log('消息类型:', messageType);
-    console.log('消息内容:', message);
-    console.log('files 参数:', files);
-    console.log('files 类型:', typeof files);
-    console.log('files 是否数组:', Array.isArray(files));
-    console.log('files 长度:', files ? files.length : 0);
-    
     // 准备JSON数据
     const requestData = {
       message_type: messageType,
@@ -188,26 +229,24 @@ export const sendChatMessageStreaming = async (message, files = [], messageType 
     if (files && files.length > 0) {
       const file = files[0]; // 目前只处理一个文件
       
-      console.log(`检查文件:`, {
-        名称: file.name,
-        大小: file.size,
-        类型: file.type,
-        是否File对象: file instanceof File,
-        是否Blob对象: file instanceof Blob
-      });
-      
       if (file instanceof File || file instanceof Blob) {
         // 如果是语音消息，将文件转换为base64
         if (messageType === 'voice') {
           try {
             const arrayBuffer = await file.arrayBuffer();
-            const uint8Array = new Uint8Array(arrayBuffer);
-            let base64String = btoa(String.fromCharCode.apply(null, uint8Array));
+            
+            // 使用更可靠的方式处理大型二进制数据
+            let binary = '';
+            const bytes = new Uint8Array(arrayBuffer);
+            const len = bytes.byteLength;
+            // 直接处理字节数据，避免使用String.fromCharCode
+            for (let i = 0; i < len; i++) {
+              binary += String.fromCharCode(bytes[i]);
+            }
+            const base64String = btoa(binary);
             
             requestData.audio_data = base64String;
             requestData.audio_mime_type = file.type;
-            
-            console.log(`✅ 成功转换音频文件为Base64, 长度: ${base64String.length} 字符, MIME类型: ${file.type}`);
           } catch (err) {
             console.error(`❌ 转换音频文件为Base64失败:`, err);
           }
@@ -217,16 +256,6 @@ export const sendChatMessageStreaming = async (message, files = [], messageType 
         console.error(`❌ 文件不是有效的File或Blob对象:`, file);
       }
     }
-    
-    // 检查关键参数
-    console.log('发送JSON请求:', {
-      url: `${API_URL}/chat`,
-      方法: 'POST',
-      消息类型: messageType,
-      有音频数据: Boolean(requestData.audio_data),
-      音频数据长度: requestData.audio_data ? requestData.audio_data.length : 0,
-      流式音频: streamAudio
-    });
     
     // 使用fetch API发送JSON请求
     const response = await fetch(`${API_URL}/chat`, {
@@ -257,8 +286,6 @@ export const sendChatMessageStreaming = async (message, files = [], messageType 
       const text = decoder.decode(value, { stream: true });
       buffer += text;
       
-      // console.log("收到流数据块，长度:", text.length);
-      
       // 处理完整的行
       const lines = buffer.split('\n');
       buffer = lines.pop() || '';
@@ -268,11 +295,10 @@ export const sendChatMessageStreaming = async (message, files = [], messageType 
         if (line.trim()) {
           try {
             const data = JSON.parse(line);
-            console.log("解析的JSON数据类型:", data.type || "未指定类型", data);
             
             // 特别检查是否有音频数据
             if (data.type === 'audio' || data.audio_data || data.segment_index !== undefined) {
-              console.log("检测到音频数据:", data.message_id, "分段:", data.segment_index || 0);
+              // 检测到音频数据
             }
             
             if (onChunk) onChunk(data);

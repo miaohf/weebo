@@ -41,7 +41,7 @@ class Assistant:
         # Load conversation history
         messages = self.db_service.load_session()
         # formatted_json = json.dumps(messages, indent=4, ensure_ascii=False, sort_keys=True)
-        # print(f"formatted_json: {formatted_json}")
+        # debug(f"formatted_json: {formatted_json}")
 
         if messages:
             self.llm_service.set_messages(messages)
@@ -82,7 +82,7 @@ class Assistant:
     
     async def get_message_audio(self, message_id: str, audio: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """获取消息的音频数据"""
-        print(f"audio: {audio}")    
+        debug(f"audio: {audio}")    
         try:
             # 检查是否有合并后的音频
             if "path" in audio and audio["path"]:
@@ -115,10 +115,13 @@ class Assistant:
     
     async def merge_audio_segments(self, message_id: str, audio_paths: List[Dict[str, Any]], storage_dir: str):
         """合并音频段落并更新数据库"""
+
+        debug(f"storage_dir: {storage_dir}")
+        debug(f"audio_paths: {audio_paths}")
         try:
             if not audio_paths:
                 return
-                
+
             # 按顺序读取所有分段音频
             audio_segments = []
             segment_file_paths = []
@@ -129,11 +132,16 @@ class Assistant:
                     audio_segments.append(data)
                     segment_file_paths.append(file_path)
             
+            debug(f"segment_file_paths: {segment_file_paths}")
+            assistant_audio_dir = os.path.join(settings.AUDIO_STORAGE_DIR, "assistant")
+
             # 合并并保存
             if audio_segments:
                 # 生成合并后的文件名和路径
                 combined_filename = f"merged_{message_id}.wav"
-                combined_path = os.path.join(storage_dir, combined_filename)
+                combined_path = os.path.join(assistant_audio_dir, combined_filename)
+
+                debug(f"combined_path: {combined_path}")
                 
                 # 合并成一个numpy数组
                 full_audio = np.concatenate(audio_segments)

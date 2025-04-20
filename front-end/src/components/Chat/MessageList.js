@@ -11,13 +11,16 @@ const MessageList = ({ onAudioData, ...props }) => {
   const lastMessageIdRef = useRef(null);
   const receivedAudioRef = useRef(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [activeAudioId, setActiveAudioId] = useState(null);
 
   // 初始化AudioCacheManager
   useEffect(() => {
     if (AudioCacheManager && typeof AudioCacheManager.init === 'function') {
-      AudioCacheManager.init()
-        .then(() => console.log('[MessageList] 音频缓存系统初始化成功'))
-        .catch(err => console.error('[MessageList] 音频缓存系统初始化失败:', err));
+      // 检查是否已初始化
+      if (!AudioCacheManager.isInitialized) {
+        AudioCacheManager.init()
+          .catch(err => console.error('音频缓存系统初始化失败:', err));
+      }
     }
   }, []);
 
@@ -69,7 +72,6 @@ const MessageList = ({ onAudioData, ...props }) => {
       lastMessage.segment_index !== undefined;
     
     if (isAudioMessage) {
-      console.log('收到音频消息，不滚动到底部:', lastMessageId);
       receivedAudioRef.current = true;
       
       if (isNewMessage) {
@@ -80,7 +82,6 @@ const MessageList = ({ onAudioData, ...props }) => {
     }
     
     if (isNewMessage && !receivedAudioRef.current) {
-      console.log('滚动到底部 - 新文本消息:', lastMessageId);
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
       setShowScrollButton(false);
     }
@@ -89,11 +90,6 @@ const MessageList = ({ onAudioData, ...props }) => {
   }, [props.messages]);
 
   const cleanupAudio = useCallback(() => {
-    console.log('[MessageList] 清理音频播放状态:', {
-      hasCurrentAudio: !!currentPlayingAudio,
-      currentPlayingMessageId
-    });
-    
     if (currentPlayingAudio) {
       currentPlayingAudio.pause();
       currentPlayingAudio.currentTime = 0;
@@ -106,7 +102,6 @@ const MessageList = ({ onAudioData, ...props }) => {
     setCurrentPlayingMessageId(null);
     
     // 触发自定义事件，通知音频播放结束
-    console.log('[MessageList] 触发音频结束事件');
     window.dispatchEvent(new CustomEvent('audio-playback-ended', {
       detail: { messageId: currentPlayingMessageId }
     }));
@@ -120,22 +115,15 @@ const MessageList = ({ onAudioData, ...props }) => {
 
   const handleReplayAudio = useCallback(async (message) => {
     const messageId = message.id || message.message_id;
-    console.log(`[MessageList] 处理音频播放请求:`, {
-      requestedMessageId: messageId, 
-      currentPlaying: currentPlayingMessageId,
-      isCurrentlyPlaying: isPlaying
-    });
     
     // 如果点击的是当前正在播放的消息，停止播放
     if (isPlaying && currentPlayingMessageId === messageId) {
-      console.log(`[MessageList] 停止当前播放的音频:`, messageId);
       cleanupAudio();
       return;
     }
 
     // 如果有其他音频正在播放，先停止
     if (currentPlayingAudio) {
-      console.log(`[MessageList] 停止之前播放的音频:`, currentPlayingMessageId);
       cleanupAudio();
     }
 
@@ -144,21 +132,14 @@ const MessageList = ({ onAudioData, ...props }) => {
       let cachedAudio;
       if (AudioCacheManager && typeof AudioCacheManager.getAudio === 'function') {
         try {
-          console.log('[MessageList] 尝试从AudioCacheManager获取合并后的音频', messageId);
           cachedAudio = await AudioCacheManager.getAudio(messageId);
-          console.log('[MessageList] 缓存查询结果:', {
-            找到缓存: !!cachedAudio,
-            音频数据长度: cachedAudio ? cachedAudio.audioData.length : 0,
-            格式: cachedAudio ? cachedAudio.format : 'unknown'
-          });
         } catch (err) {
-          console.warn('[MessageList] 从缓存获取音频失败:', err);
+          console.warn('从缓存获取音频失败:', err);
         }
       }
       
       if (cachedAudio && cachedAudio.audioData) {
-        console.log('[MessageList] 使用缓存的合并音频数据播放', messageId);
-        
+        // 创建音频对象并播放
         const audio = new Audio();
         const format = cachedAudio.format || 'wav';
         audio.src = `data:audio/${format};base64,${cachedAudio.audioData}`;
@@ -168,14 +149,12 @@ const MessageList = ({ onAudioData, ...props }) => {
         setCurrentPlayingMessageId(messageId);
         
         audio.onplay = () => {
-          console.log(`[MessageList] 缓存音频开始播放: ${messageId}`);
           setIsPlaying(true);
           setCurrentPlayingAudio(audio);
           setCurrentPlayingMessageId(messageId);
         };
         
         audio.onended = () => {
-          console.log(`[MessageList] 缓存音频播放完成:`, messageId);
           // 显式触发自定义事件，确保通知到所有组件
           window.dispatchEvent(new CustomEvent('audio-playback-ended', {
             detail: { messageId: messageId }
@@ -184,22 +163,20 @@ const MessageList = ({ onAudioData, ...props }) => {
         };
         
         audio.onerror = (e) => {
-          console.error('[MessageList] 缓存音频播放失败:', messageId, e);
+          console.error('缓存音频播放失败:', messageId, e);
           cleanupAudio();
         };
         
         try {
           await audio.play();
-          console.log(`[MessageList] 缓存音频播放调用成功: ${messageId}`);
         } catch (error) {
-          console.error(`[MessageList] 缓存音频播放调用失败: ${messageId}`, error);
+          console.error(`缓存音频播放调用失败: ${messageId}`, error);
           cleanupAudio();
         }
       }
       // 如果缓存中没有，但消息中有音频数据，则使用消息中的数据
       else if (message.has_audio && message.audio_data) {
-        console.log('[MessageList] 使用消息内嵌的音频数据播放', messageId);
-        
+        // 创建音频对象并播放
         const audio = new Audio();
         const format = message.audio_format || 'wav';
         audio.src = `data:audio/${format};base64,${message.audio_data}`;
@@ -215,7 +192,6 @@ const MessageList = ({ onAudioData, ...props }) => {
         };
         
         audio.onended = () => {
-          console.log(`[MessageList] 音频播放完成:`, messageId);
           // 显式触发自定义事件，确保通知到所有组件
           window.dispatchEvent(new CustomEvent('audio-playback-ended', {
             detail: { messageId: messageId }
@@ -224,7 +200,7 @@ const MessageList = ({ onAudioData, ...props }) => {
         };
         
         audio.onerror = () => {
-          console.error('[MessageList] 音频播放失败:', messageId);
+          console.error('音频播放失败:', messageId);
           cleanupAudio();
         };
         
@@ -232,7 +208,6 @@ const MessageList = ({ onAudioData, ...props }) => {
       } 
       // 如果以上都没有，则从API获取
       else {
-        console.log('[MessageList] 获取消息音频数据:', messageId);
         let messageAudio = await getMessageAudio(messageId);
         if (messageAudio.audio_data) {
           const audio = new Audio();
@@ -249,7 +224,6 @@ const MessageList = ({ onAudioData, ...props }) => {
           };
           
           audio.onended = () => {
-            console.log(`[MessageList] 音频播放完成:`, messageId);
             // 显式触发自定义事件，确保通知到所有组件
             window.dispatchEvent(new CustomEvent('audio-playback-ended', {
               detail: { messageId: messageId }
@@ -258,21 +232,75 @@ const MessageList = ({ onAudioData, ...props }) => {
           };
           
           audio.onerror = () => {
-            console.error('[MessageList] 音频播放失败:', messageId);
+            console.error('音频播放失败:', messageId);
             cleanupAudio();
           };
           
           await audio.play();
         } else {
-          console.warn('[MessageList] 没有可用的音频数据:', messageId);
+          console.warn('没有可用的音频数据:', messageId);
           cleanupAudio();
         }
       }
     } catch (error) {
-      console.error('[MessageList] 音频播放失败:', messageId, error);
+      console.error('音频播放失败:', messageId, error);
       cleanupAudio();
     }
-  }, [cleanupAudio, currentPlayingAudio, currentPlayingMessageId, isPlaying, setIsPlaying, setCurrentPlayingAudio, setCurrentPlayingMessageId]);
+  }, [cleanupAudio, currentPlayingAudio, currentPlayingMessageId, isPlaying]);
+
+  const handlePlayAudio = async (messageId) => {
+    try {
+      // 首先检查是否已有正在播放的音频
+      if (activeAudioId && activeAudioId !== messageId) {
+        // 停止之前的音频
+        setActiveAudioId(null);
+      }
+      
+      // 检查是否是在切换状态
+      if (activeAudioId === messageId) {
+        // 停止当前音频
+        setActiveAudioId(null);
+        return;
+      }
+      
+      // 查找要播放的消息
+      const messageToPlay = props.messages.find(msg => msg.message_id === messageId);
+      if (!messageToPlay) {
+        console.error(`未找到对应的消息: ${messageId}`);
+        return;
+      }
+      
+      // 设置当前正在播放的音频ID
+      setActiveAudioId(messageId);
+      
+      // 获取或播放音频
+      if (messageToPlay.audio) {
+        await handleReplayAudio(messageToPlay);
+      } else if (messageToPlay.message_type === 'text' && messageToPlay.role === 'assistant') {
+        // 调用API获取音频
+        const audioData = await getMessageAudio(messageId);
+        if (audioData.audio_data) {
+          // 更新消息的音频数据
+          await handleReplayAudio(messageToPlay);
+        }
+      } else if (messageToPlay.message_type === 'voice' && messageToPlay.role === 'user') {
+        // 这里假设用户的语音消息中有一个audio_url字段
+        const audioUrl = messageToPlay.audio_url;
+        if (audioUrl) {
+          await handleReplayAudio(messageToPlay);
+        } else {
+          console.error('用户语音消息缺少音频URL');
+        }
+      }
+    } catch (error) {
+      console.error('音频播放失败:', error);
+      setActiveAudioId(null);
+    }
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [props.messages, props.loading, scrollToBottom]);
 
   return (
     <div className="message-list-container">
@@ -280,17 +308,11 @@ const MessageList = ({ onAudioData, ...props }) => {
         <div className="empty-chat">Start a new conversation?</div>
       ) : (
         props.messages.map((message, index) => {
-          const hasAudioCapability = 
-            message.has_audio || 
-            message.audio_data || 
-            message.message_type === 'audio' || 
-            message.message_type === 'voice';
-          
-          console.log(`渲染消息 ${index}:`, {
-            id: message.id || message.message_id,
-            role: message.role,
-            hasAudio: hasAudioCapability
-          });
+          // const hasAudioCapability = 
+          //   message.has_audio || 
+          //   message.audio_data || 
+          //   message.message_type === 'audio' || 
+          //   message.message_type === 'voice';
           
           return (
             <Message 
@@ -298,8 +320,8 @@ const MessageList = ({ onAudioData, ...props }) => {
               message={message}
               showChinese={props.showChinese}
               onReplayAudio={handleReplayAudio}
-              onPlayAudio={props.onPlayAudio}
-              isPlaying={isPlaying && currentPlayingMessageId === (message.id || message.message_id)}
+              onPlayAudio={handlePlayAudio}
+              isPlaying={activeAudioId === (message.id || message.message_id)}
             />
           );
         })

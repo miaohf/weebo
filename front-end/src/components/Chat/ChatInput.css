@@ -231,4 +231,52 @@
 
 .upload-button:hover {
   background-color: var(--button-hover);
+}
+
+/* 添加录音状态提示的样式 */
+.recording-status {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  padding: 5px 10px;
+  background-color: rgba(255, 0, 0, 0.1);
+  border-radius: 4px;
+  font-size: 14px;
+  color: #e53935;
+}
+
+.recording-indicator {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  background-color: #e53935;
+  border-radius: 50%;
+  margin-right: 8px;
+  animation: pulse 1.5s infinite;
+}
+
+.recording-size {
+  margin-left: 5px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.6;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  100% {
+    opacity: 0.6;
+    transform: scale(0.8);
+  }
+}
+
+.record-button-text {
+  margin-left: 8px;
+  font-size: 14px;
 } 

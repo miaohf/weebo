@@ -30,12 +30,6 @@ export default class AudioRecorder {
       const tracks = this.stream.getAudioTracks();
       if (tracks.length > 0) {
         const settings = tracks[0].getSettings();
-        console.log('[AudioDebug] 录音轨道设置:', {
-          设备: settings.deviceId || '默认',
-          采样率: settings.sampleRate || '未知',
-          声道数: settings.channelCount || '未知',
-          延迟: settings.latency || '未知'
-        });
       }
       
       // 尝试使用最优的音频格式
@@ -53,7 +47,6 @@ export default class AudioRecorder {
       for (const type of mimeTypes) {
         if (MediaRecorder.isTypeSupported(type)) {
           options.mimeType = type;
-          console.log(`[AudioDebug] 选择使用录音格式: ${type}`);
           break;
         }
       }
@@ -66,10 +59,6 @@ export default class AudioRecorder {
       // 创建媒体录制器
       try {
         this.mediaRecorder = new MediaRecorder(this.stream, options);
-        console.log('[AudioDebug] 创建MediaRecorder:', {
-          类型: this.mediaRecorder.mimeType || '默认类型',
-          状态: this.mediaRecorder.state
-        });
       } catch (err) {
         console.warn('[AudioDebug] 使用指定配置创建MediaRecorder失败，使用默认配置:', err);
         this.mediaRecorder = new MediaRecorder(this.stream);
@@ -79,7 +68,6 @@ export default class AudioRecorder {
       this.mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           this.audioChunks.push(event.data);
-          console.log(`[AudioDebug] 录音片段 #${this.audioChunks.length}, 大小: ${event.data.size} 字节`);
         } else {
           console.warn('[AudioDebug] 收到空的音频数据块');
         }
@@ -101,7 +89,6 @@ export default class AudioRecorder {
         }
       }, 250); // 每250ms请求一次数据
       
-      console.log('[AudioDebug] 录音开始，使用格式:', this.mediaRecorder.mimeType || '默认格式');
       return true;
     } catch (error) {
       console.error('[AudioDebug] 启动录音失败:', error);
@@ -128,12 +115,6 @@ export default class AudioRecorder {
         const blobType = this.mediaRecorder.mimeType || 'audio/wav';
         const audioBlob = new Blob(this.audioChunks, { type: blobType });
         
-        console.log('[AudioDebug] 录音结束，音频数据:', {
-          块数: this.audioChunks.length,
-          总大小: audioBlob.size,
-          MIME类型: blobType
-        });
-        
         if (audioBlob.size <= 0) {
           console.error('[AudioDebug] 录音失败: 音频数据为空');
           this.cleanUp();
@@ -155,11 +136,6 @@ export default class AudioRecorder {
             resolve(null);
             return;
           }
-          
-          console.log('[AudioDebug] 音频转换为Base64完成:', {
-            原始大小: audioBlob.size,
-            Base64长度: base64Audio.length
-          });
           
           // 清理资源
           this.cleanUp();
@@ -190,7 +166,6 @@ export default class AudioRecorder {
         // 停止录制
         this.mediaRecorder.stop();
         this.isRecording = false;
-        console.log('[AudioDebug] 录音停止命令已发送');
       } catch (error) {
         console.error('[AudioDebug] 停止录音时出错:', error);
         this.cleanUp();
@@ -214,7 +189,6 @@ export default class AudioRecorder {
     
     this.cleanUp();
     this.isRecording = false;
-    console.log('[AudioDebug] 录音取消');
   }
 
   // 清理资源
@@ -222,7 +196,6 @@ export default class AudioRecorder {
     if (this.stream) {
       this.stream.getTracks().forEach(track => {
         track.stop();
-        console.log('[AudioDebug] 已停止音频轨道:', track.kind);
       });
       this.stream = null;
     }

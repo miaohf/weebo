@@ -32,7 +32,7 @@ export const AVAILABLE_SPEAKERS = [
   { id: 'megatts_hunhou_male_cn', label: 'megatts_hunhou_male_cn' },
   { id: 'megatts_hunhou_male2_cn', label: 'megatts_hunhou_male2_cn' },
   { id: 'megatts_hunhou_male3_cn', label: 'megatts_hunhou_male3_cn' },
-  { id: 'megatts_hunhou_male3_cn', label: 'megatts_hunhou_male3_cn' },
+  { id: 'megatts_hunhou_male4_cn', label: 'megatts_hunhou_male4_cn' },
   { id: 'megatts_hentaoyan_male4_cn', label: 'megatts_hentaoyan_male4_cn' },
   { id: 'megatts_zhongli_male5_cn', label: 'megatts_zhongli_male5_cn' },
   { id: 'megatts_xwlb_female1_cn', label: 'megatts_xwlb_female1_cn' },

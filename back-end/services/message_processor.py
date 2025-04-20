@@ -30,7 +30,7 @@ class BaseMessageProcessor:
     
     def print_user_message(self, content, content_type="text"):
         """打印用户消息到控制台"""
-        print(f"{settings.YELLOW}用户 ({content_type}): {content}{settings.RESET_COLOR}")
+        debug(f"{settings.YELLOW}用户 ({content_type}): {content}{settings.RESET_COLOR}")
         
     def split_text_to_segments(self, text, max_length=settings.MAX_SEGMENT_LENGTH):
         """将文本分割为较小的段落
@@ -170,6 +170,8 @@ class TextMessageProcessor(BaseMessageProcessor):
                                 # 创建WAV文件
                                 segment_filename = f"{assistant_message_id}_{i}.wav"
                                 segment_path = os.path.join(settings.AUDIO_STORAGE_DIR, segment_filename)
+
+                                debug(f"segment_path: {segment_path}")
                                 
                                 # 创建WAV格式的音频数据
                                 wav_buffer = io.BytesIO()
@@ -204,7 +206,7 @@ class TextMessageProcessor(BaseMessageProcessor):
                                     "format": "wav",
                                     "sample_rate": sample_rate
                                 }
-                                print(f"{i}：{assistant_message_id}")
+                                debug(f"{i}：{assistant_message_id}")
                                 yield json.dumps(segment_response) + "\n"
                                 
                             except Exception as e:
@@ -215,13 +217,13 @@ class TextMessageProcessor(BaseMessageProcessor):
                         error(f"处理音频段落{i}时出错: {e}")
                         # 继续处理下一个段落，不中断
                 
-                assistant_audio_dir = os.path.join(settings.AUDIO_STORAGE_DIR, "assistant")
+                
                 # 在后台任务中合并音频段落
                 background_tasks.add_task(
                     self.assistant.merge_audio_segments,
                     assistant_message_id,
                     audio_paths,
-                    assistant_audio_dir
+                    settings.AUDIO_STORAGE_DIR
                 )
             
             # 返回流式响应
@@ -232,8 +234,8 @@ class TextMessageProcessor(BaseMessageProcessor):
         except Exception as e:
             import traceback
             error_trace = traceback.format_exc()
-            print(f"处理文本消息时出错: {e}")
-            print(error_trace)
+            debug(f"处理文本消息时出错: {e}")
+            debug(error_trace)
             
             return JSONResponse(
                 status_code=500,
@@ -338,29 +340,29 @@ class VoiceMessageProcessor(BaseMessageProcessor):
             
         else:
             # 正常处理音频转录
-            print(f"开始转录音频，数据大小: {file_size} 字节")
+            debug(f"开始转录音频，数据大小: {file_size} 字节")
             # 保存音频数据到临时文件，便于调试
             temp_file_path = f"/tmp/audio_input_{hash(audio_file.filename)}_{file_size}.bin"
             with open(temp_file_path, "wb") as f:
                 f.write(audio_data)
-            print(f"已保存音频数据到临时文件: {temp_file_path}")
+            debug(f"已保存音频数据到临时文件: {temp_file_path}")
             
             try:
                 transcript = await self.assistant.transcribe_audio(audio_data)
                 
                 if not transcript:
-                    print("语音转录失败: 未检测到语音内容")
+                    debug("语音转录失败: 未检测到语音内容")
                     return JSONResponse(
                         status_code=400,
                         content={"error": "未检测到语音内容或转录失败", "status": "error"}
                     )
                 
-                print(f"语音转录成功: {transcript}")
+                debug(f"语音转录成功: {transcript}")
             except Exception as e:
-                print(f"转录音频时出错: {e}")
+                debug(f"转录音频时出错: {e}")
                 # 如果转录失败但我们确定有音频数据，使用后备响应
                 transcript = "我收到了您的语音消息，但无法转录内容。请问您能以文本形式重新发送您的问题吗？"
-                print(f"使用后备响应: {transcript}")
+                debug(f"使用后备响应: {transcript}")
         
         # 记录用户语音转文本的消息
         self.print_user_message(f"[voice] {transcript}")
