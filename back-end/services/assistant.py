@@ -7,6 +7,7 @@ from typing import Optional, List, Dict, Any, Union
 import numpy as np
 import soundfile as sf
 from pydub import AudioSegment
+import time
 
 from services.audio_service import AudioService
 from services.llm_service import LLMService
@@ -134,12 +135,18 @@ class Assistant:
             
             debug(f"segment_file_paths: {segment_file_paths}")
             assistant_audio_dir = os.path.join(settings.AUDIO_STORAGE_DIR, "assistant")
+            os.makedirs(assistant_audio_dir, exist_ok=True)
+            
+            # 创建日期子目录（年月日格式）
+            today = time.strftime("%Y%m%d")
+            date_dir = os.path.join(assistant_audio_dir, today)
+            os.makedirs(date_dir, exist_ok=True)
 
             # 合并并保存
             if audio_segments:
                 # 生成合并后的文件名和路径
                 combined_filename = f"merged_{message_id}.wav"
-                combined_path = os.path.join(assistant_audio_dir, combined_filename)
+                combined_path = os.path.join(date_dir, combined_filename)
 
                 debug(f"combined_path: {combined_path}")
                 

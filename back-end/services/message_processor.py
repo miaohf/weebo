@@ -167,9 +167,17 @@ class TextMessageProcessor(BaseMessageProcessor):
                                     audio_data = np.clip(audio_data, -1.0, 1.0)
                                     audio_data = (audio_data * 32767).astype(np.int16)
                                 
+                                # 创建日期子目录（年月日格式）
+                                audio_dir = os.path.join(settings.AUDIO_STORAGE_DIR, "assistant")
+                                os.makedirs(audio_dir, exist_ok=True)
+                                
+                                today = time.strftime("%Y%m%d")
+                                date_dir = os.path.join(audio_dir, today)
+                                os.makedirs(date_dir, exist_ok=True)
+                                
                                 # 创建WAV文件
                                 segment_filename = f"{assistant_message_id}_{i}.wav"
-                                segment_path = os.path.join(settings.AUDIO_STORAGE_DIR, segment_filename)
+                                segment_path = os.path.join(date_dir, segment_filename)
 
                                 debug(f"segment_path: {segment_path}")
                                 

@@ -30,16 +30,14 @@ def debug(message):
     caller_info = _get_caller_info()
     timestamp = _get_timestamp()
     print(f"{timestamp} - DEBUG - [{caller_info}] {message}")
-    # 同时写入Python标准日志
-    logger.debug(f"[{caller_info}] {message}")
+    # 已移除重复的日志记录
 
 def info(message):
     """Log info message."""
     caller_info = _get_caller_info()
     timestamp = _get_timestamp()
     print(f"{timestamp} - INFO - [{caller_info}] {message}")
-    # 同时写入Python标准日志
-    logger.info(f"[{caller_info}] {message}")
+    # 已移除重复的日志记录
 
 def user_message(message):
     """Format user message with cyan color."""
@@ -64,8 +62,7 @@ def error(message, exception=None):
     caller_info = _get_caller_info()
     timestamp = _get_timestamp()
     print(f"{timestamp} - ERROR - [{caller_info}] {message}")
-    # 同时写入Python标准日志
-    logger.error(f"[{caller_info}] {message}")
+    # 已移除重复的日志记录
     if exception:
         import traceback
         traceback.print_exc()

@@ -84,6 +84,12 @@ async def unified_chat(
                 # 保存到用户音频目录
                 user_audio_dir = os.path.join(settings.AUDIO_STORAGE_DIR, "user")
                 os.makedirs(user_audio_dir, exist_ok=True)
+                
+                # 创建日期子目录（年月日格式）
+                today = time.strftime("%Y%m%d")
+                date_dir = os.path.join(user_audio_dir, today)
+                os.makedirs(date_dir, exist_ok=True)
+                
                 timestamp = int(time.time())
                 # 处理MIME类型
                 mime_type = json_data.get('audio_mime_type', 'audio/webm')
@@ -92,7 +98,7 @@ async def unified_chat(
                 if ';' in extension:
                     extension = extension.split(';')[0]
                 
-                temp_file_path = f"{user_audio_dir}/voice_input_{timestamp}.{extension}"
+                temp_file_path = f"{date_dir}/voice_input_{timestamp}.{extension}"
                 with open(temp_file_path, "wb") as f:
                     f.write(audio_data)
                 debug(f"已保存音频数据到: {temp_file_path}")

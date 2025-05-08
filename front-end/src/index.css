@@ -1,5 +1,10 @@
 @import './styles/theme.css';
 
+/* 设置根字体大小 */
+html {
+  font-size: 12px; 
+}
+
 * {
   box-sizing: border-box;
   margin: 0;

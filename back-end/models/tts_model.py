@@ -10,6 +10,7 @@ import asyncio
 from utils.logging_utils import debug, info, error
 from core.config import settings
 import re
+from tn.chinese.normalizer import Normalizer
 
 class TextToSpeechModel:
     """Service for text-to-speech conversion."""
@@ -18,6 +19,9 @@ class TextToSpeechModel:
         """Initialize TTS model."""
         self.api_url = api_url
         self.tts_mode = settings.TTS_SERVICE_MODE
+        
+        # 初始化中文数字转换器
+        self.normalizer = Normalizer()
         
         # For local TTS (legacy)
         self.tts_session = None
@@ -49,6 +53,8 @@ class TextToSpeechModel:
             self.speaker = settings.TTS_SPEAKER
             if self.tts_mode == "local":
                 self._init_legacy_local_model()
+        
+        self.max_chunk_size = getattr(settings, 'TTS_MAX_CHUNK_SIZE', 500)
     
     def _init_legacy_local_model(self):
         """Initialize legacy local TTS model."""
@@ -114,24 +120,38 @@ class TextToSpeechModel:
         """Set the speaker for TTS."""
         self.speaker = speaker
     
-    async def generate_audio_async(self, text):
-        """Asynchronously generate audio from text using API."""
+    def normalize_chinese_numbers(self, text):
+        """将文本中的数字转换为中文读法"""
+        try:
+            return self.normalizer.normalize(text)
+        except Exception as e:
+            error(f"数字转换失败: {e}")
+            return text
+    
+    def _preprocess_text(self, text):
+        """预处理文本：数字转换和空白处理"""
         if not text or not text.strip():
             return None
+        text = self.normalize_chinese_numbers(text)
+        return ' '.join(text.split())
+
+    async def generate_audio_async(self, text):
+        """Asynchronously generate audio from text using API."""
+        text = self._preprocess_text(text)
+        if not text:
+            return None
             
-        text = ' '.join(text.split())
-        
         # 检查文本长度，如果过长则分段处理
-        if len(text) > 500:  # 如果超过500个字符
+        if len(text) > self.max_chunk_size:
             debug(f"Text is long ({len(text)} chars), splitting into chunks")
             # 使用自然断句点分割文本
-            sentences = re.split(r'(?<=[.!?])\s+', text)
+            sentences = re.split(r'(?<=[.!?。！？])\s*', text)
             chunks = []
             current_chunk = ""
             
             # 组合成适当大小的块
             for sentence in sentences:
-                if len(current_chunk) + len(sentence) < 500:
+                if len(current_chunk) + len(sentence) < self.max_chunk_size:
                     current_chunk += (" " if current_chunk else "") + sentence
                 else:
                     if current_chunk:
@@ -147,21 +167,20 @@ class TextToSpeechModel:
             audio_segments = []
             for i, chunk in enumerate(chunks):
                 debug(f"Processing chunk {i+1}/{len(chunks)}: {chunk[:30]}...")
-                result = await self._generate_audio_for_text(chunk)
+                result = await self.process_chunk_with_retry(chunk)
                 if result:
                     audio_segments.append(result)
             
             # 合并音频段
             if audio_segments:
-                # 提取第一个段的采样率
-                combined_audio = np.concatenate([seg[0] for seg in audio_segments])
                 sample_rate = audio_segments[0][1]
+                combined_audio = self.combine_audio_segments(audio_segments, sample_rate)
                 return (combined_audio, sample_rate)
             return None
         else:
             # 原始处理逻辑
-            return await self._generate_audio_for_text(text)
-        
+            return await self.process_chunk_with_retry(text)
+    
     # 提取实际的API调用到单独的方法
     async def _generate_audio_for_text(self, text):
         if self.tts_mode == "elevenlabs":
@@ -477,23 +496,48 @@ class TextToSpeechModel:
         """Process text chunks and return audio segments."""
         audio_segments = []
         for chunk in text_chunks:
-            chunk = chunk.strip()
+            chunk = self._preprocess_text(chunk)
             if not chunk:
                 continue
                 
-            audio_segment = await self.generate_audio_async(chunk)
+            audio_segment = await self.process_chunk_with_retry(chunk)
             if audio_segment is not None:
                 audio_segments.append(audio_segment)
         
-        return audio_segments
+        if audio_segments:
+            sample_rate = audio_segments[0][1]
+            combined_audio = self.combine_audio_segments(audio_segments, sample_rate)
+            return (combined_audio, sample_rate)
+        return None
 
     # 添加新方法，用于处理单个文本段
     async def generate_audio_segment(self, text):
         """生成单个文本段的音频，不拼接"""
-        if not text or not text.strip():
+        text = self._preprocess_text(text)
+        if not text:
             return None
-        
-        text = ' '.join(text.split())
-        
-        # 直接调用API生成单段音频
-        return await self._generate_audio_for_text(text)
+        return await self.process_chunk_with_retry(text)
+
+    def combine_audio_segments(self, audio_segments, sample_rate, silence_duration=0.5):
+        """合并音频段，添加间隔"""
+        silence = np.zeros(int(silence_duration * sample_rate))
+        combined = []
+        for i, (audio, _) in enumerate(audio_segments):
+            combined.append(audio)
+            if i < len(audio_segments) - 1:  # 不在最后一段后添加静音
+                combined.append(silence)
+        return np.concatenate(combined)
+
+    async def process_chunk_with_retry(self, chunk, max_retries=3):
+        """处理单个文本块，支持重试"""
+        for attempt in range(max_retries):
+            try:
+                result = await self._generate_audio_for_text(chunk)
+                if result:
+                    return result
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    error(f"Failed to process chunk after {max_retries} attempts: {e}")
+                    return None
+                await asyncio.sleep(1)  # 重试前等待
+        return None

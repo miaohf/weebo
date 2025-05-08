@@ -94,6 +94,53 @@ class LLMService:
             # 重建消息历史
             self.messages = system_messages + recent_messages
             debug(f"Truncated conversation history to {len(self.messages)} messages")
+
+    def _clean_markdown(self, text):
+        # 处理标题标识符，在处理后的标题末尾添加句号
+        lines = text.split('\n')
+        processed_lines = []
+        
+        for line in lines:
+            # 判断是否是标题行
+            title_match = re.match(r'^(#+)\s+(.*?)$', line)
+            if title_match:
+                # 获取标题文本
+                title_text = title_match.group(2).strip()
+                # 检查标题末尾是否已有标点符号
+                if title_text and not re.search(r'[.!?。！？：:;；]$', title_text):
+                    # 根据检测到的语言添加适当的标点
+                    lang = self._detect_language(title_text)
+                    if lang == 'chinese':
+                        title_text += '。'  # 中文句号
+                    else:
+                        title_text += '.'   # 英文句号
+                processed_lines.append(title_text)
+            else:
+                processed_lines.append(line)
+                
+        text = '\n'.join(processed_lines)
+        
+        # 继续处理其他Markdown格式
+        # 去掉强调符号 (*, _)
+        text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)  # 粗体
+        text = re.sub(r'\*(.*?)\*', r'\1', text)  # 斜体
+        text = re.sub(r'__(.*?)__', r'\1', text)  # 粗体
+        text = re.sub(r'_(.*?)_', r'\1', text)  # 斜体
+        
+        # 去掉链接，只保留文字
+        text = re.sub(r'\[(.*?)\]\(.*?\)', r'\1', text)
+        
+        # 去掉代码块 (```)
+        text = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
+        
+        # 去掉行内代码 (`code`)
+        text = re.sub(r'`.*?`', '', text)
+        
+        # 去掉其他 Markdown 特殊符号
+        text = re.sub(r'[>]+\s?', '', text)  # 引用符号
+        text = re.sub(r'[-*+]\s+', '', text)  # 列表符号
+        
+        return text.strip()
             
     def _sanitize_for_tts(self, text):
         """Remove emojis and other problematic characters for TTS"""
@@ -199,7 +246,9 @@ class LLMService:
             llm_response = self._get_llm_response()
             debug(f"LLM response: {llm_response}")
 
-            original_response = self._sanitize_for_tts(llm_response)
+            llm_response_remove_emoji = self._sanitize_for_tts(llm_response)
+            original_response = self._clean_markdown(llm_response_remove_emoji)
+            # original_response = self._clean_response(llm_response_remove_markdown)
             debug(f"Sanitized response: {original_response}")
             
             if not original_response:
@@ -580,25 +629,64 @@ class LLMService:
         return '\n'.join(chinese_lines)
 
     def _clean_response(self, response: str) -> str:
-        """Clean up the response for TTS.
+        """Clean up the response for TTS and convert Markdown to plain text.
         
         Args:
-            response: The raw response text
+            response: The raw response text with Markdown formatting
             
         Returns:
-            Cleaned response text
+            Plain text response with Markdown formatting removed
         """
+        if not response:
+            return ""
+            
         # 移除代码块标记，保留代码内容
         response = re.sub(r'```[\w]*\n(.*?)```', r'\1', response, flags=re.DOTALL)
+        
+        # 移除行内代码标记，保留代码内容
+        response = re.sub(r'`([^`]+)`', r'\1', response)
         
         # 移除Markdown链接，保留文本
         response = re.sub(r'\[(.*?)\]\(.*?\)', r'\1', response)
         
-        # 移除多余的空行
+        # 处理标题，保留文本内容
+        response = re.sub(r'^#{1,6}\s+(.*?)$', r'\1', response, flags=re.MULTILINE)
+        
+        # 处理引用块，移除 > 符号
+        response = re.sub(r'^>\s*(.*?)$', r'\1', response, flags=re.MULTILINE)
+        
+        # 处理无序列表，保留文本（可以选择性地保留或替换列表标记）
+        response = re.sub(r'^[\*\-\+]\s+(.*?)$', r'• \1', response, flags=re.MULTILINE)
+        
+        # 处理有序列表，保留数字和文本
+        response = re.sub(r'^\d+\.\s+(.*?)$', r'\1', response, flags=re.MULTILINE)
+        
+        # 移除多余的空行，但保留段落结构
         response = re.sub(r'\n{3,}', '\n\n', response)
         
-        # 移除特殊Markdown字符
-        response = re.sub(r'[*_]{1,2}(.*?)[*_]{1,2}', r'\1', response)
+        # 处理粗体和斜体文本，保留文本内容
+        response = re.sub(r'\*\*(.*?)\*\*', r'\1', response)  # 粗体 **text**
+        response = re.sub(r'__(.*?)__', r'\1', response)      # 粗体 __text__
+        response = re.sub(r'\*(.*?)\*', r'\1', response)      # 斜体 *text*
+        response = re.sub(r'_(.*?)_', r'\1', response)        # 斜体 _text_
+        
+        # 处理表格 - 简化为文本，保留内容
+        # 移除表格分隔行
+        response = re.sub(r'\|[\-:|\s]+\|', '', response)
+        # 将表格单元格内容保留，移除分隔符
+        response = re.sub(r'\|(.*?)\|', r'\1', response)
+        
+        # 处理水平线，替换为空行
+        response = re.sub(r'^-{3,}$|^_{3,}$|^\*{3,}$', '\n', response, flags=re.MULTILINE)
+        
+        # 处理HTML标签，移除标签保留文本
+        response = re.sub(r'<(?!img|br)([a-z][a-z0-9]*)[^>]*>(.*?)</\1>', r'\2', response, flags=re.DOTALL|re.IGNORECASE)
+        response = re.sub(r'<br\s*/?>|<hr\s*/?>|<img[^>]*>', ' ', response, flags=re.IGNORECASE)
+        
+        # 处理转义字符
+        escape_chars = ['\\', '`', '*', '_', '{', '}', '[', ']', '(', ')', '#', '+', '-', '.', '!']
+        for char in escape_chars:
+            response = response.replace('\\' + char, char)
         
         return response.strip()
         

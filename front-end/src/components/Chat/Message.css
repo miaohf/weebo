@@ -1,7 +1,6 @@
 /* 消息基本样式 */
 .message {
   position: relative;
-  /* margin-bottom: 6px;  */
   padding: 10px;
   border-radius: 16px;
   max-width: 80%;
@@ -79,20 +78,19 @@
 .message-content {
   overflow-wrap: break-word;
   word-break: break-word;
-  /* 为按钮留出空间 */
-  /* padding-right: 32px;  */
+  font-size: 1rem; /* 标准字体大小 */
 }
 
 .message-content p {
   margin: 0;
   padding: 0;
   color: #333; /* 确保文字颜色与背景对比明显 */
+  font-size: 1rem;
 }
 
 .message-text-container {
   position: relative;
   display: block;
-  /* margin-bottom: 8px; */
   line-height: 1.4;
 }
 
@@ -100,6 +98,7 @@
   display: inline;
   word-break: break-word;
   overflow-wrap: break-word;
+  font-size: 1rem;
 }
 
 .message-content p,
@@ -108,6 +107,13 @@
   overflow-wrap: break-word;
 }
 
+.message-translated {
+  font-size: 0.875rem; /* 稍小的字体大小用于翻译文本 */
+  color: #666;
+  margin-top: -4px;
+}
+
+/* 图片样式 */
 .message-image-container {
   margin: 5px 0;
   max-width: 250px;
@@ -122,6 +128,33 @@
   cursor: pointer;
 }
 
+.message-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.message-image {
+  max-width: 200px;
+  max-height: 200px;
+  border-radius: 8px;
+  object-fit: cover;
+  box-shadow: 0 2px 4px var(--shadow-color);
+}
+
+/* 语音消息样式 */
+.voice-message-container {
+  position: relative;
+}
+
+.voice-message {
+  display: flex;
+  align-items: center;
+  border-radius: 18px;
+  max-width: 260px;
+}
+
 .voice-indicator {
   display: flex;
   align-items: center;
@@ -132,23 +165,24 @@
   opacity: 0.8;
 }
 
-@media (max-width: 768px) {
-  .message {
-    max-width: 90%;
-  }
-  
-  .message-image-container {
-    max-width: 200px;
-  }
+.voice-message-icon {
+  margin-right: 8px;
+  color: var(--primary-color);
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.message-actions {
-  display: none;
+.voice-message-text {
+  font-size: 1rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+  margin-right: 0;
+  flex: 1;
 }
 
 .audio-message {
@@ -183,6 +217,7 @@
   color: var(--text-secondary);
 }
 
+/* 音频播放按钮样式 */
 .play-audio-button:hover:not(:disabled) {
   background-color: var(--primary-light);
 }
@@ -253,7 +288,6 @@
 /* 播放状态 - 只添加脉冲动画，颜色保持一致 */
 .replay-audio-btn.playing {
   animation: pulse 1.5s infinite;
-  /* 不修改颜色、背景色和其他属性，保持与非播放状态一致 */
 }
 
 /* 加载状态的颜色 */
@@ -267,7 +301,49 @@
   animation: spin 1s linear infinite;
 }
 
-/* 添加主题响应样式 */
+.message-actions {
+  display: none;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .message {
+    max-width: 90%;
+  }
+  
+  .message-image-container {
+    max-width: 200px;
+  }
+}
+
+/* 动画效果 */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(82, 153, 229, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 3px rgba(82, 153, 229, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(82, 153, 229, 0);
+  }
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* 主题设置 */
 :root {
   /* 默认亮色主题 */
   --button-bg: rgba(255, 255, 255, 0.25);
@@ -313,92 +389,4 @@
   --button-bg: rgba(124, 77, 255, 0.2);
   --button-color: #7c4dff;
   --button-hover-bg: rgba(124, 77, 255, 0.3);
-}
-
-.message-images {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 10px;
-}
-
-.message-image {
-  max-width: 200px;
-  max-height: 200px;
-  border-radius: 8px;
-  object-fit: cover;
-  box-shadow: 0 2px 4px var(--shadow-color);
-}
-
-/* 语音消息样式 */
-.voice-message-container {
-  position: relative;
-}
-
-.voice-message {
-  display: flex;
-  align-items: center;
-  /* background-color: rgba(0, 0, 0, 0.05); */
-  border-radius: 18px;
-  /* padding: 8px 12px; */
-  max-width: 260px;
-}
-
-.voice-message-icon {
-  margin-right: 8px;
-  color: var(--primary-color);
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.voice-message-text {
-  font-size: 14px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 180px;
-  margin-right: 0;
-  flex: 1;
-}
-
-/* .user .voice-message {
-  background-color: rgba(255, 255, 255, 0.2);
-} */
-
-/* .user .voice-message-text {
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.user .voice-message-icon {
-  color: rgba(255, 255, 255, 0.9);
-} */
-
-.message-translated {
-  font-size: 14px;
-  color: #666;
-  margin-top: -4px;
-}
-
-@keyframes pulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(82, 153, 229, 0.4);
-  }
-  70% {
-    box-shadow: 0 0 0 3px rgba(82, 153, 229, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(82, 153, 229, 0);
-  }
-}
-
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
 }
